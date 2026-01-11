@@ -1,0 +1,20 @@
+# Session State Manager - Git Ignore
+
+# Cache directory (session-specific data)
+.claude/cache/
+
+# Temporary files from hooks
+/tmp/ssm-*
+/tmp/claude-context-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# If using handoffs for very long sessions (optional - you may want to commit these)
+# tasks/*/handoffs/auto-handoff-*.md
