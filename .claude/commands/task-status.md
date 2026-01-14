@@ -1,113 +1,149 @@
 ---
 name: task-status
-description: Show current task progress and status
+description: Show current task progress from progress.md (source of truth)
+allowed-tools: Read, Bash(cat:*), Bash(ls:*), Bash(grep:*), TodoWrite
 ---
 
 # Task Status
 
 Display comprehensive status of the current task.
 
-## Step 1: Load Current State
+**IMPORTANT**: This command reads from `progress.md` as the source of truth, NOT from TodoWrite.
+The TodoWrite UI may lag behind actual progress.
+
+## Step 1: Determine Session and State File
 
 ```bash
-cat .claude/state/active.md
-```
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+ACTIVE_STATE=".claude/state/active.md"
 
-Extract:
-- Current Task ID
-- Phase and Step
-- Blocked status
-- Current Focus
-
-## Step 2: Load Task Progress
-
-```bash
-TASK_ID=$(grep -A1 "^## Current Task" .claude/state/active.md | tail -1 | xargs)
-
-if [ -d "tasks/$TASK_ID" ]; then
-    echo "=== Task: $TASK_ID ==="
-    
-    # Show progress
-    echo ""
-    echo "--- Progress ---"
-    cat "tasks/$TASK_ID/progress.md"
-    
-    # Show plan summary
-    echo ""
-    echo "--- Plan Summary ---"
-    head -50 "tasks/$TASK_ID/plan.md"
+if [ -f "$SESSION_STATE" ]; then
+    STATE_FILE="$SESSION_STATE"
 else
-    echo "No active task found."
+    STATE_FILE="$ACTIVE_STATE"
 fi
 ```
 
-## Step 3: Calculate Completion
-
-Count completed vs total items:
+## Step 2: Get Current Task
 
 ```bash
-if [ -f "tasks/$TASK_ID/progress.md" ]; then
-    TOTAL=$(grep -c '^\- \[' "tasks/$TASK_ID/progress.md" || echo 0)
-    DONE=$(grep -c '^\- \[x\]' "tasks/$TASK_ID/progress.md" || echo 0)
-    echo ""
-    echo "Completion: $DONE / $TOTAL items"
+TASK_ID=$(grep -A1 "^## Current Task" "$STATE_FILE" | tail -1 | xargs)
+
+if [ -z "$TASK_ID" ] || [ "$TASK_ID" = "none" ] || [ "$TASK_ID" = "None" ]; then
+    echo "No active task for this session."
+    echo "Use /new-task <name> to start one."
+    exit 0
 fi
 ```
 
-## Step 4: Check for Blockers
+## Step 3: Read Progress from progress.md (Source of Truth)
 
 ```bash
-BLOCKED=$(grep "^BLOCKED:" .claude/state/active.md | cut -d':' -f2 | xargs)
-if [ "$BLOCKED" = "Yes" ]; then
-    echo ""
-    echo "⚠️ BLOCKERS DETECTED"
-    grep -A10 "^## Blockers" .claude/state/active.md | head -10
+PROGRESS_FILE="tasks/$TASK_ID/progress.md"
+
+if [ ! -f "$PROGRESS_FILE" ]; then
+    echo "Warning: progress.md not found for task $TASK_ID"
+    exit 1
 fi
+
+# Parse progress
+TOTAL=$(grep -c '^\- \[' "$PROGRESS_FILE" 2>/dev/null || echo 0)
+DONE=$(grep -c '^\- \[x\]' "$PROGRESS_FILE" 2>/dev/null || echo 0)
+PERCENT=$((DONE * 100 / TOTAL))
+
+# Get current phase
+CURRENT_PHASE=$(grep "Current Phase" "$PROGRESS_FILE" | head -1 | cut -d':' -f2 | xargs)
+
+# Get next item
+NEXT_ITEM=$(grep -A1 "NEXT" "$PROGRESS_FILE" | head -1)
 ```
 
-## Step 5: Show Next Actions
+## Step 4: Read Additional Context
 
 ```bash
-echo ""
-echo "--- Next Steps ---"
-grep -A5 "^## Next Steps" .claude/state/active.md | tail -5
+# Get goal from task.md
+GOAL=$(grep -A1 "^## Goal" "tasks/$TASK_ID/task.md" | tail -1)
+
+# Get current focus from state
+FOCUS=$(grep -A1 "^## Current Focus" "$STATE_FILE" | tail -1)
+
+# Check for blockers
+BLOCKED=$(grep "^BLOCKED:" "$STATE_FILE" | cut -d':' -f2 | xargs)
 ```
 
----
+## Step 5: Sync to TodoWrite (Update UI)
 
-## Status Report Format
+After reading progress.md, sync to TodoWrite so UI reflects actual state:
 
-Present status in this format:
+```
+Read progress.md checkboxes and convert to TodoWrite format:
+- [ ] item → status: "pending"
+- [x] item → status: "completed"
+- Item with **NEXT** → status: "in_progress"
+```
+
+Call TodoWrite with the parsed items to sync UI.
+
+## Step 6: Display Status Report
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 TASK STATUS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Task: [task-id]
-Phase: [phase name] (Step X of Y)
-Status: [IN_PROGRESS | BLOCKED | PAUSED]
+Task: <task-id>
+Goal: <goal>
+Session: <session-id>
 
-Progress: ████████░░░░░░░░ 50% (5/10 items)
+Phase: <current-phase>
+Progress: ████████░░░░░░░░ <percent>% (<done>/<total> steps)
 
 Current Focus:
-→ [current focus from active.md]
+→ <focus>
 
-Next Steps:
-1. [ ] [next step 1]
-2. [ ] [next step 2]
+Next Step:
+→ <next-item>
 
-Blockers: [None | List blockers]
+Files: tasks/<task-id>/
+  ├── plan.md      - Implementation phases
+  ├── progress.md  - Progress (SOURCE OF TRUTH)
+  ├── context.md   - Files to load
+  └── decisions.md - Key decisions
+
+Blockers: <None | list>
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quick Actions:
+  • Continue with current focus
+  • /save-state → Save before clearing
+  • /active-tasks → See all tasks
 ```
 
-## Quick Commands
+## Step 7: Show Detailed Progress
 
-After showing status, suggest relevant actions:
+After the summary, show the detailed progress from progress.md:
 
-- **Continue work**: Just proceed with Current Focus
-- **Save progress**: `/save-state`
-- **View full plan**: `cat tasks/<task-id>/plan.md`
-- **View decisions**: `cat tasks/<task-id>/decisions.md`
-- **Mark complete**: Update progress.md checkboxes
+```bash
+echo ""
+echo "=== Detailed Progress (from progress.md) ==="
+echo ""
+cat "$PROGRESS_FILE"
+```
+
+## Key Principles
+
+1. **progress.md is truth** - Always read from file, not memory
+2. **Sync to TodoWrite** - Update UI after reading file
+3. **Show file locations** - Help user know where data lives
+4. **Session-aware** - Use correct state file for session
+
+## Progress Tracking Note
+
+The TodoWrite UI at the bottom of Claude Code may show slightly different
+progress due to async updates. The `progress.md` file is always accurate.
+
+If UI seems out of sync:
+1. Run `/task-status` to force sync
+2. UI will update from progress.md

@@ -1,11 +1,14 @@
 #!/bin/bash
 #
-# Pre-Compact Hook
-# - Manual compact: BLOCK and prompt user to use /save-state + /clear
-# - Auto compact: Create auto-save handoff before allowing
+# Pre-Compact Hook - BLOCKS ALL COMPACTION
+#
+# SSM philosophy: Compaction degrades context quality. Always use save-state + clear instead.
+#
+# - Manual compact: BLOCK with guidance to use /save-state + /clear
+# - Auto compact: BLOCK with urgent guidance (creates emergency handoff first)
 #
 # Input: JSON with trigger field (auto|manual)
-# Output: JSON with decision (block) or continue
+# Output: JSON with continue: false to block compaction
 #
 
 # DO NOT use set -e - hooks must always return valid JSON
@@ -22,72 +25,90 @@ ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 TIMESTAMP=$(date -Iseconds 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)
 SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
 
-if [ "$TRIGGER" = "manual" ]; then
-    # BLOCK manual compaction
-    cat << 'EOF'
-{
-  "decision": "block",
-  "reason": "MANUAL COMPACTION BLOCKED\n\nCompaction degrades context quality. Use the state management workflow instead:\n\n1. Run /save-state to preserve current progress\n2. Run /clear to start fresh with full context quality\n3. Your state will auto-load on the new session\n\nThis approach maintains higher signal quality than compaction."
-}
-EOF
+# Helper: Create emergency handoff file
+create_emergency_handoff() {
+    local task="$1"
+    local handoff_dir="$PROJECT_DIR/tasks/$task/handoffs"
+    local handoff_file="$handoff_dir/emergency-$(date +%Y%m%d-%H%M%S 2>/dev/null || echo 'unknown').md"
 
-elif [ "$TRIGGER" = "auto" ]; then
-    # Auto-compact triggered - create emergency handoff
-    
-    # Get current task info (with safe default)
-    CURRENT_TASK="unknown"
-    if [ -f "$ACTIVE_STATE" ]; then
-        CURRENT_TASK=$(grep -A1 "^## Current Task" "$ACTIVE_STATE" 2>/dev/null | tail -1 | tr -d '[:space:]' || echo "unknown")
-    fi
-    [ -z "$CURRENT_TASK" ] && CURRENT_TASK="unknown"
-    
-    # Create auto-handoff directory
-    HANDOFF_DIR="$PROJECT_DIR/tasks/$CURRENT_TASK/handoffs"
-    mkdir -p "$HANDOFF_DIR" 2>/dev/null || true
-    
-    # Create auto-handoff file
-    HANDOFF_FILE="$HANDOFF_DIR/auto-handoff-$(date +%Y%m%d-%H%M%S 2>/dev/null || echo 'unknown').md"
-    
-    # Write handoff file (in subshell to avoid breaking on failure)
-    (
-    cat > "$HANDOFF_FILE" << HANDOFF
-# Auto-Handoff (Context Limit Reached)
+    mkdir -p "$handoff_dir" 2>/dev/null || return 1
+
+    cat > "$handoff_file" 2>/dev/null << HANDOFF
+# Emergency Handoff (Compaction Blocked)
 
 Created: $TIMESTAMP
 Session: $SESSION_ID
-Trigger: Auto-compaction (context window ~95% full)
+Trigger: Context limit reached (~95%)
 
-## Warning
+## Important
 
-This handoff was created automatically because context reached capacity.
-Some details may be missing. Review and supplement if needed.
+Compaction was BLOCKED to preserve context quality.
+Please run /save-state then /clear to continue.
 
-## State at Compaction
+## Current State Snapshot
 
-Task: $CURRENT_TASK
+Task: $task
 
-### Last Known State
+### State at Block
 $(cat "$ACTIVE_STATE" 2>/dev/null || echo "State file not found")
 
 ---
 
-## Recovery Instructions
+## Recovery Steps
 
-1. After compaction, run /continue-task to reload state
-2. Check tasks/$CURRENT_TASK/progress.md for task status
-3. Review this handoff for any additional context
+1. Run /save-state to save your current progress
+2. Run /clear to start fresh
+3. Your state will auto-load on the new session
+4. Continue from where you left off
 
-## Note
-
-Consider running /save-state + /clear more frequently
-to avoid auto-compaction. This preserves higher context quality.
+This approach preserves full context fidelity.
 HANDOFF
-    ) 2>/dev/null || true
 
-    # Allow compaction to proceed with message
-    printf '{\n  "continue": true,\n  "suppressOutput": false,\n  "systemMessage": "AUTO-COMPACTION IN PROGRESS\\n\\nAn auto-handoff has been saved.\\nAfter compaction completes, your state will be reloaded.\\nConsider using /save-state + /clear more frequently."\n}\n'
+    echo "$handoff_file"
+}
+
+# Get current task info
+CURRENT_TASK="unknown"
+if [ -f "$ACTIVE_STATE" ]; then
+    CURRENT_TASK=$(grep -A1 "^## Current Task" "$ACTIVE_STATE" 2>/dev/null | tail -1 | tr -d '[:space:]' || echo "unknown")
+fi
+[ -z "$CURRENT_TASK" ] && CURRENT_TASK="unknown"
+
+if [ "$TRIGGER" = "manual" ]; then
+    # BLOCK manual compaction
+    cat << 'EOF'
+{
+  "continue": false,
+  "stopReason": "COMPACTION BLOCKED\n\nCompaction degrades context quality through summarization.\nUse SSM's state management workflow instead:\n\n  1. Run /save-state to preserve your progress\n  2. Run /clear to start fresh\n  3. State auto-loads on new session\n\nThis maintains full context fidelity vs lossy compaction."
+}
+EOF
+
+elif [ "$TRIGGER" = "auto" ]; then
+    # BLOCK auto-compaction (with emergency handoff)
+
+    # Create emergency handoff first
+    HANDOFF_FILE=$(create_emergency_handoff "$CURRENT_TASK" 2>/dev/null || echo "")
+
+    if [ -n "$HANDOFF_FILE" ] && [ -f "$HANDOFF_FILE" ]; then
+        HANDOFF_MSG="Emergency handoff saved to: $HANDOFF_FILE"
+    else
+        HANDOFF_MSG="(Could not create handoff file)"
+    fi
+
+    # BLOCK compaction - this is the key change
+    cat << EOF
+{
+  "continue": false,
+  "stopReason": "AUTO-COMPACTION BLOCKED\\n\\nContext window is nearly full, but compaction has been prevented.\\nCompaction degrades quality - use save+clear instead:\\n\\n  1. Run /save-state NOW\\n  2. Run /clear\\n  3. Continue with fresh context\\n\\n$HANDOFF_MSG"
+}
+EOF
 
 else
-    # Unknown trigger, allow by default
-    echo '{"continue": true}'
+    # Unknown trigger - block to be safe
+    cat << 'EOF'
+{
+  "continue": false,
+  "stopReason": "COMPACTION BLOCKED\n\nUse /save-state + /clear instead to preserve context quality."
+}
+EOF
 fi

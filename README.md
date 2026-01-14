@@ -2,14 +2,19 @@
 
 A structured context and task management system that prevents context loss during compaction and enables efficient multi-session workflows.
 
-## ✨ Key Features
+## Key Features
 
-- **Multi-Instance Support**: Run multiple Claude Code terminals, each on different tasks
+- **Bulletproof Compaction Prevention**: Auto-compaction is completely blocked - you control when to clear
+- **Auto-Save on Edits**: Working files automatically tracked after every edit
+- **Context Warnings**: Proactive alerts at 50%, 60%, 70%, 75% thresholds (auto-save at 75%)
+- **Full Task Structure**: Rich task files with progress.md as source of truth
+- **Multi-Instance Support**: Run multiple Claude Code terminals with session ownership rules
 - **Session Isolation**: Each instance has its own state file - no conflicts
 - **Task Registry**: Central tracking of all active, paused, and completed tasks
 - **Smart Handoffs**: Seamlessly pass work between terminals
 - **Context Preservation**: Save state before `/clear`, auto-reload after
-- **Task Completion**: Proper archival with summaries and history
+- **Subagent Integration**: Use Explorer and Planner agents to keep context clean
+- **Multi-Session Tasks**: Large tasks spanning multiple sessions is normal and expected
 
 ## The Problem This Solves
 
@@ -23,19 +28,56 @@ SSM Approach:
 Session → work → /save-state → /clear → fresh session + full state loaded
 ```
 
-## Quick Start
+### Critical: Context Thresholds
 
-### 1. Install
+**The auto-compact buffer is ~45k tokens (22.5%). Danger zone starts at 77.5%.**
+
+| Level | % | Action |
+|-------|---|--------|
+| Safe | < 50% | Normal work |
+| Notice | 50-60% | Good checkpoint opportunity |
+| Warning | 60-70% | Plan to save soon |
+| **Strong** | 70-75% | Finish step, then save+clear |
+| **CRITICAL** | > 75% | **SAVE NOW** - 5k to danger |
+
+**Large tasks spanning multiple sessions is NORMAL:**
+```
+Session 1: Phases 1-2 → save → clear
+Session 2: Phases 3-4 → save → clear
+Session 3: Phases 5-6 → complete
+```
+Progress preserved in `progress.md`. No information loss.
+
+## Installation
+
+### Option 1: Plugin Install (Recommended)
 
 ```bash
-./setup.sh /path/to/your/project
-# Or manually:
-cp -r ssm-template/.claude /path/to/project/
-cp -r ssm-template/tasks /path/to/project/
-cp ssm-template/CLAUDE.md /path/to/project/
+# In Claude Code
+/plugin install ssm
 ```
 
-### 2. Start Working
+That's it! SSM auto-initializes on first session.
+
+### Option 2: Manual Setup
+
+```bash
+# Clone and run setup script
+git clone https://github.com/brian/ssm
+./ssm/setup.sh /path/to/your/project
+```
+
+### Option 3: Copy Files
+
+```bash
+cp -r ssm/.claude /path/to/project/
+cp -r ssm/tasks /path/to/project/
+cp ssm/CLAUDE.md /path/to/project/
+```
+
+## Quick Start
+
+### Start Working
 
 ```bash
 claude
@@ -95,8 +137,13 @@ your-project/
 │   ├── rules/
 │   └── scripts/
 └── tasks/
-    ├── .templates/
-    └── <task-id>/               # Per-task directories
+    ├── .templates/              # Task file templates
+    │   ├── task.md              # Goal, status, metadata
+    │   ├── plan.md              # Phases with checkpoints
+    │   ├── progress.md          # ★ Source of truth
+    │   ├── context.md           # Files with token estimates
+    │   └── decisions.md         # Key decisions
+    └── <task-id>/               # Per-task directories (full structure)
 ```
 
 ## Commands Reference
@@ -137,6 +184,16 @@ your-project/
 
 ## Multi-Instance Workflow
 
+### Session Ownership Rules
+
+**CRITICAL: Sessions own their tasks. Never modify another session's task.**
+
+| Your Task | Other Session's Task |
+|-----------|---------------------|
+| Can view, edit, update | Can VIEW only |
+| Can complete or release | CANNOT edit or update |
+| Full access | Use `/claim-task` to take ownership |
+
 ### Running Parallel Tasks
 
 ```
@@ -151,8 +208,8 @@ your-project/
 │                                 │                                 │
 │ > /active-tasks                 │ > /active-tasks                 │
 │ Shows:                          │ Shows:                          │
-│ - auth-refactor (this session)  │ - payment-api (this session)    │
-│ - payment-api (session def456)  │ - auth-refactor (session abc123)│
+│ - 🔵 auth-refactor (YOURS)      │ - 🔵 payment-api (YOURS)        │
+│ - ⚪ payment-api (other)        │ - ⚪ auth-refactor (other)      │
 └─────────────────────────────────┴─────────────────────────────────┘
 ```
 
@@ -180,6 +237,33 @@ your-project/
 # Clears session state
 # Suggests next task
 ```
+
+## Progress Tracking
+
+### Source of Truth: progress.md
+
+**`progress.md` is THE source of truth for task progress.** TodoWrite is just a UI mirror.
+
+```markdown
+# Example progress.md
+- [x] Phase 1: Research
+- [ ] **IN PROGRESS** → Phase 2: Implementation
+- [ ] Phase 3: Testing
+```
+
+### Workflow
+
+1. Complete work on a step
+2. Update `progress.md` with `[x]`
+3. Sync to TodoWrite for UI visibility
+4. Update `active.md` current focus
+
+### Why progress.md?
+
+- **Persists across sessions** - survives /clear
+- **Single source** - no sync conflicts
+- **Human readable** - easy to review
+- **Git trackable** - can commit progress
 
 ## State Files Explained
 
@@ -246,10 +330,13 @@ Central tracking of all tasks:
 ## Best Practices
 
 1. **One task per session**: Keep work isolated
-2. **Save often**: Don't wait for context warnings
-3. **Use /active-tasks**: Know what's being worked on
-4. **Complete properly**: Don't abandon tasks, use /complete-task
-5. **Release when pausing**: Use /release-task for clean handoffs
+2. **Save at 70%**: Don't wait until 90% - danger is at 77.5%
+3. **progress.md is truth**: Update it, sync to TodoWrite
+4. **Use /active-tasks**: Know what's being worked on
+5. **Complete properly**: Don't abandon tasks, use /complete-task
+6. **Release when pausing**: Use /release-task for clean handoffs
+7. **Respect ownership**: Never modify another session's task
+8. **Large tasks are normal**: Spanning multiple sessions is expected
 
 ## Troubleshooting
 
@@ -267,6 +354,32 @@ Central tracking of all tasks:
 - Sessions >24h inactive show stale warning
 - Can be reclaimed by other sessions
 - Review state before continuing
+
+### Context warnings not appearing
+- Warnings now appear at 50%, 60%, 70%, 75%
+- Auto-save triggers at 75% (critical)
+- Check `/context` for current usage
+
+### Progress not syncing
+- `progress.md` is source of truth, not TodoWrite
+- Run `/task-status` to sync progress.md to TodoWrite
+- Update progress.md first, then sync
+
+## Version History
+
+### v2.0 (Current)
+- New context thresholds: 50%, 60%, 70%, 75% (was 70%, 80%, 90%)
+- `progress.md` as source of truth (not TodoWrite)
+- Full task structure created by default (5 files)
+- Session ownership rules enforced
+- Large tasks spanning sessions documented as normal
+- Auto-save at 75% critical threshold
+- Task detection prompting for multi-step work
+
+### v1.0
+- Initial release with basic state management
+- Multi-instance support
+- Compaction blocking
 
 ## License
 

@@ -1,0 +1,45 @@
+{
+  "name": "ssm",
+  "version": "1.0.0",
+  "description": "Session State Manager - Bulletproof context preservation and task management for Claude Code",
+  "author": {
+    "name": "Brian",
+    "url": "https://github.com/brian"
+  },
+  "homepage": "https://github.com/brian/ssm",
+  "repository": "https://github.com/brian/ssm",
+  "license": "MIT",
+  "keywords": [
+    "context-management",
+    "task-management",
+    "session-state",
+    "compaction-prevention",
+    "multi-instance"
+  ],
+  "commands": [".claude/commands/"],
+  "skills": [".claude/skills/"],
+  "agents": [".claude/agents/"],
+  "hooks": ".claude/hooks.json",
+  "rules": [
+    {
+      "path": ".claude/rules/ssm/core.md",
+      "globs": ["**/*"]
+    },
+    {
+      "path": ".claude/rules/ssm/tasks.md",
+      "globs": ["tasks/**/*"]
+    },
+    {
+      "path": ".claude/rules/ssm/state.md",
+      "globs": [".claude/state/**/*"]
+    }
+  ],
+  "scripts": {
+    "postinstall": ".claude/scripts/post-install.sh"
+  },
+  "files": [
+    ".claude/",
+    "tasks/",
+    "CLAUDE.md"
+  ]
+}

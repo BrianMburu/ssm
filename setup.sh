@@ -25,10 +25,11 @@ echo "📦 Session State Manager (SSM) Setup"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo -e "${CYAN}Features:${NC}"
-echo "  • Multi-instance support (run parallel Claude terminals)"
-echo "  • Per-session state isolation"
+echo "  • Multi-instance support with session ownership rules"
+echo "  • Full task structure (5 files) with progress.md as source of truth"
+echo "  • Context warnings at 50%, 60%, 70%, 75% (auto-save at 75%)"
 echo "  • Task registry and handoff coordination"
-echo "  • Automatic state loading on session start"
+echo "  • Large tasks spanning multiple sessions supported"
 echo ""
 echo "Source: $SCRIPT_DIR"
 echo "Target: $TARGET_DIR"
@@ -146,6 +147,15 @@ if [ ! -d "$TARGET_DIR/.claude/state/completed" ]; then
     echo -e "  ${GREEN}  → Created .claude/state/completed/${NC}"
 fi
 
+# Task templates
+if [ ! -f "$TARGET_DIR/tasks/.templates/progress.md" ]; then
+    echo -e "  ${YELLOW}⚠ Missing: task templates${NC}"
+    WARNINGS=$((WARNINGS + 1))
+else
+    TEMPLATE_COUNT=$(ls -1 "$TARGET_DIR/tasks/.templates/"*.md 2>/dev/null | wc -l)
+    echo -e "  ${GREEN}✓ Task templates installed ($TEMPLATE_COUNT files)${NC}"
+fi
+
 # Skills
 if [ ! -f "$TARGET_DIR/.claude/skills/session-state/SKILL.md" ]; then
     echo -e "  ${YELLOW}⚠ Missing: session-state skill${NC}"
@@ -161,8 +171,15 @@ else
     echo -e "  ${GREEN}✓ Multi-instance skill installed${NC}"
 fi
 
+if [ ! -f "$TARGET_DIR/.claude/skills/task-management/SKILL.md" ]; then
+    echo -e "  ${YELLOW}⚠ Missing: task-management skill${NC}"
+    WARNINGS=$((WARNINGS + 1))
+else
+    echo -e "  ${GREEN}✓ Task-management skill installed${NC}"
+fi
+
 # Commands
-COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task")
+COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task" "task-status" "task-history" "ssm-status")
 MISSING_COMMANDS=0
 for cmd in "${COMMANDS[@]}"; do
     if [ ! -f "$TARGET_DIR/.claude/commands/$cmd.md" ]; then
@@ -191,9 +208,21 @@ if [ $ERRORS -eq 0 ]; then
     echo "  2. Start Claude Code in your project"
     echo "  3. Use /new-task to create your first task"
     echo ""
+    echo -e "${CYAN}IMPORTANT - Context Thresholds:${NC}"
+    echo "  < 50%   Safe zone"
+    echo "  50-60%  Good checkpoint opportunity"
+    echo "  60-70%  Plan to save soon"
+    echo "  70-75%  ${YELLOW}Finish step, then save+clear${NC}"
+    echo "  > 75%   ${RED}SAVE NOW - 5k to danger zone${NC}"
+    echo ""
+    echo -e "${CYAN}Key Concepts:${NC}"
+    echo "  • progress.md is source of truth (not TodoWrite)"
+    echo "  • Large tasks spanning sessions is NORMAL"
+    echo "  • Never modify tasks owned by other sessions"
+    echo ""
     echo -e "${CYAN}Task Lifecycle:${NC}"
-    echo "  /new-task <id>   - Create a new task"
-    echo "  /task-status     - Show current task progress"
+    echo "  /new-task <id>   - Create task (5 files)"
+    echo "  /task-status     - Show progress from progress.md"
     echo "  /complete-task   - Mark done and archive"
     echo ""
     echo -e "${CYAN}Session Management:${NC}"

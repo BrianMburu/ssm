@@ -1,319 +1,305 @@
 ---
 name: new-task
-argument-hint: <task-id>
-description: Create a new task with proper structure. Registers in active-tasks.md and creates session state.
-allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(cat:*), Bash(date:*)
+argument-hint: <task-id> [goal description]
+description: Create a new task with full structure for effective multi-session work.
+allowed-tools: Read, Write, Edit, Bash(mkdir:*), Bash(date:*), Bash(cp:*), TodoWrite, Task
 ---
 
-# Create New Task: $ARGUMENTS
+# Create New Task
 
-Setting up task structure, session state, and registry entry.
+Create task: **$ARGUMENTS**
 
-## Step 1: Validate and Setup
+## Step 1: Parse Arguments
 
-```bash
-TASK_ID="$ARGUMENTS"
-TASK_DIR="tasks/$TASK_ID"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
-TIMESTAMP=$(date -Iseconds)
-DATE=$(date +%Y-%m-%d)
+```
+Input: "$ARGUMENTS"
 
-# Check if task already exists
-if [ -d "$TASK_DIR" ]; then
-    echo "Task '$TASK_ID' already exists!"
-    echo "Use /claim-task $TASK_ID to take it over."
-    exit 1
-fi
-
-# Create directories
-mkdir -p "$TASK_DIR/handoffs"
-mkdir -p ".claude/state/sessions"
+Examples:
+- "auth-refactor" → ID: auth-refactor, Goal: (ask user)
+- "add user authentication" → ID: add-user-auth, Goal: Add user authentication
+- "fix-login-bug fix the login redirect issue" → ID: fix-login-bug, Goal: Fix the login redirect issue
 ```
 
-## Step 2: Create Task Files from Templates
+If only ID provided, ask user for goal before proceeding.
 
-### Plan File (`tasks/<id>/plan.md`)
+## Step 2: Handle Existing Session Task
 
+Before creating, check if this session has an active task:
+
+1. Read `.claude/state/active-tasks.md`
+2. Find tasks owned by THIS session (match `$CLAUDE_SESSION_ID`)
+3. If found, mark ONLY those as PAUSED (don't touch other sessions' tasks)
+4. Update the registry
+
+**Important**: Never modify tasks owned by other sessions!
+
+## Step 3: Create Full Task Structure
+
+```bash
+TASK_ID="<extracted-task-id>"
+TIMESTAMP=$(date -Iseconds)
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+DATE=$(date +%Y-%m-%d)
+
+mkdir -p "tasks/$TASK_ID"
+```
+
+Create ALL of these files (full structure, not minimal):
+
+### tasks/<task-id>/task.md
 ```markdown
-# Implementation Plan: <task-id>
+# Task: <task-id>
 
-Created: <timestamp>
-Owner: <session-id>
+Created: <TIMESTAMP>
+Status: IN_PROGRESS
+Session: <SESSION_ID>
+Owner: <SESSION_ID>
 
 ## Goal
 
-<!-- What is this task trying to achieve? Be specific. -->
+<Clear goal statement>
 
-## Background
+## Quick Links
 
-<!-- Why is this task needed? Context for future readers. -->
+- [Plan](./plan.md) - Implementation phases and checkpoints
+- [Progress](./progress.md) - Detailed progress tracking (source of truth)
+- [Context](./context.md) - Files to load, token estimates
+- [Decisions](./decisions.md) - Key decisions made
 
-## Prerequisites
+## Metadata
 
-<!-- What must be true/done before starting? -->
-- [ ] Prerequisite 1
-- [ ] Prerequisite 2
-
-## Implementation Steps
-
-### Phase 1: Planning
-1. [ ] Define detailed requirements
-2. [ ] Identify affected files
-3. [ ] Design approach
-
-### Phase 2: Implementation
-4. [ ] Step description
-5. [ ] Step description
-6. [ ] Step description
-
-### Phase 3: Verification
-7. [ ] Write tests
-8. [ ] Run tests
-9. [ ] Code review
-
-## Acceptance Criteria
-
-<!-- How do we know this task is complete? -->
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] All tests pass
-- [ ] No regressions
-
-## Technical Notes
-
-<!-- Any technical context or constraints -->
-
-## Out of Scope
-
-<!-- Explicitly what this task does NOT include -->
-
-## Risks & Mitigations
-
-| Risk | Mitigation |
-|------|------------|
-| Risk 1 | Mitigation 1 |
-```
-
-### Progress File (`tasks/<id>/progress.md`)
-
-```markdown
-# Task Progress: <task-id>
-
-Status: NOT_STARTED
-Started: <timestamp>
-Last Updated: <timestamp>
-Current Session: <session-id>
-
-## Progress Tracking
-
-### Prerequisites
-- [ ] Prerequisite 1
-- [ ] Prerequisite 2
-
-### Implementation
-- [ ] **NEXT** → First step
-- [ ] Second step
-- [ ] Third step
-
-### Verification
-- [ ] Tests written
-- [ ] Tests passing
-- [ ] Reviewed
-
-## Session Log
-
-| Date | Session | Duration | Progress |
-|------|---------|----------|----------|
-| <date> | <session-id> | - | Task created |
-
-## Blockers
-
-<!-- Current blockers -->
+| Field | Value |
+|-------|-------|
+| Created | <TIMESTAMP> |
+| Started | <TIMESTAMP> |
+| Last Updated | <TIMESTAMP> |
+| Current Phase | 1 |
+| Sessions Used | 1 |
 
 ## Notes
 
-<!-- Running notes about the task -->
-```
-
-### Context File (`tasks/<id>/context.md`)
-
-```markdown
-# Context Requirements: <task-id>
-
-## Essential Files (Always Load)
-
-| File | Tokens (est.) | Reason |
-|------|--------------|--------|
-| tasks/<id>/plan.md | ~500 | Current plan |
-| <!-- file --> | <!-- tokens --> | <!-- reason --> |
-
-## Reference Files (Load on Demand)
-
-| File | Tokens (est.) | When Needed |
-|------|--------------|-------------|
-| tasks/<id>/decisions.md | ~200 | When making decisions |
-
-## Deprecated Files (Never Load)
-
-<!-- Files that are outdated or already processed -->
-
-## Token Budget
-
-- Essential context: ~X tokens
-- Maximum recommended: ~5,000 tokens
-- Current usage: TBD
-
-## Related Code Locations
-
-<!-- Key areas of the codebase for this task -->
-```
-
-### Decisions File (`tasks/<id>/decisions.md`)
-
-```markdown
-# Key Decisions: <task-id>
-
-## Decision Log
-
-### Decision 1: [Title]
-
-**Date**: <date>
-**Status**: PROPOSED | DECIDED | IMPLEMENTED
-**Deciders**: <who made the decision>
-
-**Context**: 
-What prompted this decision?
-
-**Options Considered**:
-1. Option A - pros/cons
-2. Option B - pros/cons
-
-**Decision**: 
-What was decided?
-
-**Rationale**: 
-Why this choice?
-
-**Consequences**: 
-What does this mean going forward?
+<!-- Running notes -->
 
 ---
 
-<!-- Add more decisions as needed using the template above -->
+## Status History
+
+| Timestamp | Status | Session | Notes |
+|-----------|--------|---------|-------|
+| <TIMESTAMP> | IN_PROGRESS | <SESSION_ID> | Task created |
 ```
 
-## Step 3: Register in Active Tasks
+### tasks/<task-id>/plan.md
 
-Add entry to `.claude/state/active-tasks.md`:
+Use the Plan subagent to generate an initial plan:
 
-```markdown
-## Currently Active
-
-| Task ID | Session | Started | Phase | Status |
-|---------|---------|---------|-------|--------|
-| <task-id> | <session-id> | <date> | Planning | ACTIVE |
+```
+Task tool:
+- subagent_type: "Plan"
+- prompt: "Create an implementation plan for: <GOAL>. Include 3-4 phases with estimated token usage and checkpoint recommendations. Format with phases, steps, acceptance criteria."
 ```
 
-## Step 4: Create Session State
+If Plan subagent unavailable, create basic structure:
+```markdown
+# Implementation Plan: <task-id>
 
-Create `.claude/state/sessions/session-<id>.md`:
+Created: <TIMESTAMP>
+Goal: <GOAL>
+
+## Context Budget
+
+| Phase | Est. Tokens | Checkpoint? |
+|-------|-------------|-------------|
+| Phase 1: Research | ~30k | No |
+| Phase 2: Implementation | ~50k | **Yes** |
+| Phase 3: Testing | ~30k | Optional |
+| Phase 4: Cleanup | ~20k | **Yes** |
+
+## Phases
+
+### Phase 1: Research & Understanding
+1. [ ] Explore relevant code
+2. [ ] Identify files to modify
+3. [ ] Document in context.md
+
+### Phase 2: Core Implementation
+1. [ ] Implement main changes
+2. [ ] Update related files
+
+### Phase 3: Testing
+1. [ ] Write/update tests
+2. [ ] Verify functionality
+
+### Phase 4: Cleanup
+1. [ ] Code cleanup
+2. [ ] Update docs
+
+## Acceptance Criteria
+- [ ] Goal achieved
+- [ ] Tests pass
+- [ ] No regressions
+```
+
+### tasks/<task-id>/progress.md
+```markdown
+# Progress: <task-id>
+
+**Status**: IN_PROGRESS
+**Current Phase**: 1
+**Started**: <TIMESTAMP>
+**Last Updated**: <TIMESTAMP>
+
+## Important
+
+**This file is the source of truth for progress tracking.**
+
+## Progress Overview
+
+| Phase | Status | Steps Done |
+|-------|--------|------------|
+| Phase 1 | IN_PROGRESS | 0/3 |
+| Phase 2 | NOT_STARTED | 0/2 |
+| Phase 3 | NOT_STARTED | 0/2 |
+| Phase 4 | NOT_STARTED | 0/2 |
+
+## Detailed Progress
+
+### Phase 1: Research
+- [ ] **NEXT** → Explore relevant code
+- [ ] Identify files to modify
+- [ ] Document in context.md
+
+### Phase 2: Implementation
+- [ ] Implement main changes
+- [ ] Update related files
+
+### Phase 3: Testing
+- [ ] Write/update tests
+- [ ] Verify functionality
+
+### Phase 4: Cleanup
+- [ ] Code cleanup
+- [ ] Update docs
+
+## Session Log
+
+| Session | Date | Phases | Notes |
+|---------|------|--------|-------|
+| <SESSION_ID> | <DATE> | 1 | Task created |
+```
+
+### tasks/<task-id>/context.md
+```markdown
+# Context: <task-id>
+
+## Essential Files
+
+| File | Est. Tokens | Reason |
+|------|-------------|--------|
+| <!-- Add during research --> | | |
+
+## Do NOT Load
+
+| File | Reason |
+|------|--------|
+| node_modules/* | Never |
+| dist/* | Build output |
+```
+
+### tasks/<task-id>/decisions.md
+```markdown
+# Decisions: <task-id>
+
+## Decision Log
+
+No decisions yet. Add as they arise.
+
+## Pending Decisions
+
+- [ ] Any architectural questions to resolve?
+```
+
+## Step 4: Register Task
+
+Add to `.claude/state/active-tasks.md` under "Currently Active":
 
 ```markdown
-# Session State: <session-id>
+| <task-id> | <SESSION_ID> | IN_PROGRESS | <DATE> | Phase 1 |
+```
 
-Created: <timestamp>
-Updated: <timestamp>
-Terminal: Current
+**Important**: Preserve all other rows. Only add this new row.
 
+## Step 5: Update Session State
+
+Update `.claude/state/active.md`:
+
+```markdown
 ## Current Task
 <task-id>
 
 ## Status
-PHASE: Planning
-STEP: 0 of 0
+PHASE: Phase 1 - Research
+STEP: 1
 BLOCKED: No
-LAST_ACTION: Task created
+LAST_ACTION: Task created with full structure
 
 ## Immediate Context (Load These)
-- tasks/<task-id>/plan.md (define the plan)
-- tasks/<task-id>/progress.md (track progress)
-
-## Do NOT Load
-<!-- Nothing yet -->
-
-## Working Files (Modified This Session)
-<!-- None yet -->
+- tasks/<task-id>/plan.md
+- tasks/<task-id>/progress.md
+- tasks/<task-id>/context.md
 
 ## Current Focus
-Define the implementation plan for <task-id>
+Begin Phase 1: Research and understand the codebase for <GOAL>
 
 ## Next Steps
-1. [ ] Define clear goal
-2. [ ] List prerequisites  
-3. [ ] Create implementation steps
-4. [ ] Set acceptance criteria
-5. [ ] Begin implementation
-
-## Key Decisions This Session
-<!-- None yet -->
-
-## Blockers / Questions
-<!-- None yet -->
-
-## Session Log
-| Timestamp | Action | Notes |
-|-----------|--------|-------|
-| <timestamp> | Task Created | New task: <task-id> |
+1. [ ] **NEXT** → Explore relevant code
+2. [ ] Identify files to modify
+3. [ ] Document findings in context.md
 ```
 
-## Step 5: Update Context Registry
+## Step 6: Initialize TodoWrite
 
-Add section to `.claude/state/context-registry.md`:
+Sync progress.md to TodoWrite for UI visibility:
 
-```markdown
-## Task: <task-id>
-
-### Essential (Always Load)
-| File | Tokens | Notes |
-|------|--------|-------|
-| tasks/<task-id>/plan.md | ~500 | Implementation plan |
-| tasks/<task-id>/progress.md | ~300 | Current progress |
-
-### Reference (Load on Demand)
-| File | Tokens | Notes |
-|------|--------|-------|
-| tasks/<task-id>/context.md | ~200 | File requirements |
-| tasks/<task-id>/decisions.md | ~200 | Key decisions |
-
-### Deprecated (Never Load)
-<!-- Will be populated as task progresses -->
+```javascript
+TodoWrite([
+  { content: "Phase 1: Explore relevant code", status: "in_progress", activeForm: "Exploring code" },
+  { content: "Phase 1: Identify files to modify", status: "pending", activeForm: "Identifying files" },
+  { content: "Phase 1: Document in context.md", status: "pending", activeForm: "Documenting context" },
+  { content: "Phase 2: Implement main changes", status: "pending", activeForm: "Implementing" },
+  { content: "Phase 3: Write/update tests", status: "pending", activeForm: "Testing" },
+  { content: "Phase 4: Cleanup and docs", status: "pending", activeForm: "Cleaning up" }
+])
 ```
 
-## Step 6: Begin Planning
+## Step 7: Output and Begin
 
-Now help the user define the task by asking:
+Show:
+```
+✅ Task created: <task-id>
 
-1. **What is the specific goal?**
-   What should be true when this task is complete?
+Goal: <GOAL>
 
-2. **What files will be involved?**
-   Which parts of the codebase are affected?
+Structure created:
+  tasks/<task-id>/
+  ├── task.md      ← Metadata and status
+  ├── plan.md      ← Implementation phases
+  ├── progress.md  ← Progress tracking (source of truth)
+  ├── context.md   ← Files to load
+  └── decisions.md ← Key decisions
 
-3. **What are the implementation steps?**
-   Break down into concrete actions.
+Current phase: Phase 1 - Research
+First step: Explore relevant code
 
-4. **What are the acceptance criteria?**
-   How do we verify success?
+Ready to begin. What area of the codebase should we explore first?
+```
 
-After gathering answers, update plan.md with the concrete details.
+Then immediately help the user start Phase 1.
 
-## Summary
+## Key Principles
 
-Task created with:
-- ✅ Task directory: `tasks/<task-id>/`
-- ✅ Plan, progress, context, decisions files
-- ✅ Registered in active-tasks.md
-- ✅ Session state created
-- ✅ Context registry updated
-
-Ready to begin planning!
+1. **Full structure by default** - All files created, not "progressive disclosure"
+2. **progress.md is truth** - TodoWrite mirrors it but may lag
+3. **Plan has checkpoints** - Know where to save+clear
+4. **Session ownership** - Only modify this session's tasks
+5. **Start immediately** - Setup done, begin working

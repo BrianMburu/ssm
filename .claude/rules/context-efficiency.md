@@ -2,16 +2,50 @@
 
 Guidelines for maintaining high-quality context while minimizing token usage.
 
+## Critical: Context Window Limits
+
+**Total context window**: 200k tokens
+**Auto-compact buffer**: ~45k tokens (22.5%)
+**Danger zone starts at**: 77.5% (155k tokens)
+
+Auto-compaction can trigger once you enter the buffer zone. SSM blocks it, but you MUST clear context before this point to maintain quality.
+
+## Warning Thresholds (Adjusted for 45k Buffer)
+
+| Level | Percentage | Tokens | Action |
+|-------|-----------|--------|--------|
+| Green | < 50% | < 100k | Normal operation |
+| Notice | 50-60% | 100-120k | Good checkpoint opportunity |
+| Warning | 60-70% | 120-140k | Plan to save soon |
+| **Strong** | 70-75% | 140-150k | Finish step, then save+clear |
+| **CRITICAL** | > 75% | > 150k | **SAVE NOW** - 5k to danger |
+| Danger | > 77.5% | > 155k | In buffer - too late |
+
+**Key insight**: Our old 90% threshold was WRONG. By 80% you're already in the danger zone.
+
 ## Token Budget Guidelines
 
 | Context Level | Token Budget | Use Case |
 |--------------|--------------|----------|
-| Minimal | < 2,000 | Quick fixes, single file changes |
-| Standard | 2,000 - 5,000 | Normal feature work |
-| Extended | 5,000 - 10,000 | Complex refactoring |
-| Maximum | 10,000+ | Major architectural changes |
+| Minimal | < 50k (25%) | Quick fixes, single file changes |
+| Standard | 50-100k (25-50%) | Normal feature work |
+| Extended | 100-140k (50-70%) | Complex refactoring |
+| Maximum | 140-150k (70-75%) | Large changes, then MUST clear |
 
-**Rule**: Stay at the minimum level needed for the current task.
+**Rule**: Plan checkpoints at 60-70% to allow graceful save+clear.
+
+## Large Tasks Span Sessions
+
+**This is NORMAL and EXPECTED:**
+- A complex feature may require 3-5 sessions
+- Each session: load state → work → save state → clear
+- Progress is preserved in `progress.md` and `plan.md`
+- No context degradation from compaction
+
+**Do NOT try to**:
+- Complete large tasks in one session
+- Ignore context warnings
+- Push past 75% without clearing
 
 ## File Loading Rules
 
@@ -28,7 +62,7 @@ Guidelines for maintaining high-quality context while minimizing token usage.
    - Related but not directly modified files
 
 3. **Never Load** (Skip these)
-   - Files marked "Deprecated" in context-registry.md
+   - Files marked "Deprecated" in context.md
    - Completed research documents
    - Build outputs and generated files
    - node_modules, vendor, etc.
@@ -38,7 +72,7 @@ Guidelines for maintaining high-quality context while minimizing token usage.
 **Do**:
 - Load only what's needed for current step
 - Use file slices (specific line ranges) when possible
-- Reference context-registry.md for token estimates
+- Check task's `context.md` for token estimates
 - Unload files after using them
 
 **Don't**:
@@ -47,45 +81,21 @@ Guidelines for maintaining high-quality context while minimizing token usage.
 - Load test files when not writing tests
 - Load configuration files unless modifying them
 
-## Context Monitoring
+## Context-Aware Planning
 
-### Warning Thresholds
+Every `plan.md` should include:
 
-| Level | Percentage | Action |
-|-------|------------|--------|
-| Green | < 60% | Normal operation |
-| Yellow | 60-70% | Be mindful, consider what to load next |
-| Orange | 70-80% | Finish current item, then save + clear |
-| Red | 80-90% | Save state immediately |
-| Critical | > 90% | Emergency save, auto-compact imminent |
-
-### Monitoring Commands
-
-```bash
-# Check current context (status line shows this)
-# Format: 🟢 45% | main U:3 | task | phase
-
-# Manual check if status line unavailable
-/context-check
+```markdown
+### Phase X: [Name]
+Estimated context: ~Xk tokens
+Checkpoint: Yes/No (good place to save+clear)
 ```
 
-## Information Density
-
-### High-Value Context
-
-Prioritize loading:
-- Type definitions and interfaces
-- Function signatures (not implementations)
-- Test assertions (expected behavior)
-- API contracts
-
-### Low-Value Context
-
-Avoid loading:
-- Long implementation files entirely
-- Verbose configuration
-- Build scripts (unless debugging builds)
-- Documentation not relevant to current task
+Recommended checkpoint phases:
+- After research/exploration
+- After major implementation milestones
+- Before testing phase
+- When context reaches 60-70%
 
 ## Session Scope
 
@@ -99,17 +109,20 @@ Avoid loading:
 - Easier to track progress
 - Simpler to resume
 
-### Task Handoff
+### Natural Session Lifecycle
 
-When switching tasks:
-1. Complete or pause current task
-2. Run `/save-state`
-3. Run `/clear`
-4. Start new task with `/new-task` or `/continue-task`
+```
+1. Session starts → load state from active.md
+2. Work on current phase → update progress.md
+3. Context reaches 60-70% → finish current step
+4. Save state → /save-state
+5. Clear → /clear
+6. New session → state auto-loads, continue
+```
 
 ## Compression Prevention
 
-### Why Prevent Compression
+### Why We Block Compaction
 
 Each compression:
 - Loses specific details
@@ -117,29 +130,28 @@ Each compression:
 - Reduces code accuracy
 - Degrades decision context
 
-After 2-3 compressions, Claude is working with "gist" not "specifics".
+After 2-3 compressions, Claude works with "gist" not "specifics".
 
 ### Prevention Strategy
 
-1. **Proactive Clearing**: Save and clear before compression triggers
+1. **Proactive Clearing**: Save and clear at 70%, not 90%
 2. **Structured State**: Write to files, not conversation
 3. **Selective Loading**: Only load what's needed now
-4. **Regular Checkpoints**: Save state at natural breakpoints
+4. **Regular Checkpoints**: Plan saves at natural breakpoints
 
 ## Recovery Patterns
 
-### After Auto-Compression
+### After Emergency (Hit 75%+)
 
-If compression happens despite prevention:
-
-1. An auto-handoff was created in `tasks/<id>/handoffs/`
-2. Review the auto-handoff for captured state
-3. Run `/continue-task` to reload from active.md
-4. Supplement with manual review if needed
+1. Auto-checkpoint created in `.claude/state/checkpoints/`
+2. Run `/save-state` immediately
+3. Run `/clear`
+4. State auto-loads on new session
+5. Continue from where you left off
 
 ### After Long Break
 
 1. Run `/continue-task` to load state
-2. Run `/task-status` to see full picture
-3. Verify plan is still appropriate
+2. Review `progress.md` for current status
+3. Check `plan.md` for next phase
 4. Update state if priorities changed

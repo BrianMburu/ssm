@@ -1,89 +1,79 @@
 ---
-name: session-state-manager
-description: Manages session state for task continuity. Use when starting work, before clearing context, when context is getting high, or when the user mentions saving progress, state, or continuity.
-allowed-tools: Read, Write, Edit, Bash(cat:*), Bash(date:*), Bash(grep:*)
+name: session-state
+description: Saves and loads session state. Activates on "save state", "save progress", "before clear", "continue work", "pick up where", "resume", "what was I working on", or when context is high and user should save.
+allowed-tools: Read, Write, Edit, Bash(date:*)
 ---
 
-# Session State Manager Skill
+# Session State Skill
 
-This skill helps maintain task continuity across sessions by managing state files.
+Maintains task continuity across sessions by managing state files.
 
-## When to Activate
+## When to Auto-Activate
 
-Automatically activate when:
-- Starting a new session (check for existing state)
-- User mentions "save state", "save progress", "before clearing"
-- Context usage appears high (suggest saving)
-- User asks to "continue", "pick up", or "resume" work
+**Saving State:**
+- "Save state" / "Save progress" / "Save my work"
+- "Before I clear" / "Before clearing"
+- "I need to stop" / "Wrapping up"
+- "Let me save" / "Preserve progress"
+
+**Loading State:**
+- "Continue work" / "Continue where I left off"
+- "Pick up where" / "Resume work"
+- "What was I working on?"
+- "Load my state" / "Reload state"
+
+**Context Warnings:**
+- When context usage is high (70%+), suggest saving
 - Before any `/clear` operation
 
-## State Files
+## State File Location
 
-The source of truth is `.claude/state/active.md`. This file contains:
-- Current task identifier
-- Phase and step progress
-- Files to load (Immediate Context)
-- Current focus description
-- Next steps checklist
+Primary: `.claude/state/active.md`
+Per-session: `.claude/state/sessions/session-<id>.md`
 
-## Loading State
+## Saving State (Quick)
 
-When starting work or continuing:
-
-1. Read `.claude/state/active.md`
-2. Extract the Current Task ID
-3. Load files listed in "Immediate Context"
-4. If a task is active, also read `tasks/<task-id>/progress.md`
-
-```bash
-cat .claude/state/active.md
-```
-
-## Saving State
-
-Before `/clear` or when context is high:
-
-1. Update `.claude/state/active.md` with:
-   - Current timestamp
-   - PHASE and STEP progress
-   - LAST_ACTION completed
-   - Files in Immediate Context (what to reload)
-   - Current Focus (next action)
-   - Next Steps (remaining work)
-
-2. Update task progress file if applicable:
-   - Check off completed items: `[x]`
-   - Mark current item: `[ ] **IN PROGRESS** →`
-
-## State File Template
+Update state file with:
 
 ```markdown
-# Active Session State
-Updated: [ISO timestamp]
-Session: [identifier]
+Updated: <now>
+Session: <session-id>
 
 ## Current Task
-[task-id]
+<task-id>
 
 ## Status
-PHASE: [phase name]
-STEP: [X] of [Y]
-BLOCKED: [Yes/No]
-LAST_ACTION: [what was just done]
-
-## Immediate Context (Load These)
-- [file path] (reason)
+PHASE: <current phase>
+BLOCKED: No
+LAST_ACTION: <what was just completed>
 
 ## Current Focus
-[One clear sentence about immediate next action]
+<next action to take>
 
 ## Next Steps
-1. [ ] [next item]
-2. [ ] [following item]
+1. [ ] <next item>
+2. [ ] <following item>
 ```
 
-## Integration with Built-in Commands
+Also update the todo list to reflect current progress.
 
-- Use `/context` to check current context usage
-- Use `/compact` only as last resort (prefer save + `/clear`)
-- Use `/todos` to see task items (integrates with our progress tracking)
+## Loading State (Quick)
+
+1. Read `.claude/state/active.md`
+2. Show: Task, Phase, Current Focus
+3. Load files from "Immediate Context"
+4. Report: "Continuing <task>. Next: <focus>"
+
+## Integration
+
+- **Auto-save**: PostToolUse hook tracks Working Files automatically
+- **Context warnings**: Hook warns at 70%, 80%, 90%
+- **Compaction blocked**: PreCompact hook blocks, suggests save+clear
+
+## Key Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/save-state` | Save before clearing |
+| `/continue-task` | Load and continue |
+| `/clear` | Clear context (state reloads) |

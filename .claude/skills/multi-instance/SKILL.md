@@ -1,161 +1,208 @@
 ---
-name: multi-instance-coordinator
-description: Coordinates work across multiple Claude Code sessions. Use when user mentions other terminals, parallel work, switching tasks, handoffs, or asks what else is being worked on.
-allowed-tools: Read, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(date:*), Bash(find:*), Bash(grep:*)
+name: multi-instance
+description: Coordinates work across Claude sessions. Activates on "other terminal", "other session", "parallel work", "what else", "hand off", "take over", "claim task", "switch task", or "who's working on".
+allowed-tools: Read, Write, Edit, Bash(ls:*), Bash(date:*), Bash(find:*)
 ---
 
 # Multi-Instance Coordinator Skill
 
-Manages task allocation and state across multiple concurrent Claude Code sessions.
+Manages task allocation across multiple concurrent Claude Code sessions.
 
-## When to Activate
+## Critical: Session Ownership Rules
 
-Automatically activate when user:
-- Mentions "other sessions", "other terminals", "other instances"
-- Asks "what else is being worked on" or "parallel work"
-- Wants to "switch tasks" or "hand off"
-- Mentions "different task" or "work on something else"
-- Asks about task ownership or claiming
+**NEVER modify tasks owned by other sessions.**
 
-## Key Files
+Each session can ONLY:
+- Create new tasks (owned by this session)
+- Modify tasks IT owns (same session ID)
+- Claim PAUSED tasks (changes ownership)
+- Release its own tasks (marks PAUSED)
 
-| File | Purpose |
-|------|---------|
-| `.claude/state/active-tasks.md` | Registry of all tasks and their owners |
-| `.claude/state/sessions/session-<id>.md` | Per-session state files |
-| `$CLAUDE_SESSION_ID` | Current session identifier (env var) |
+**When creating a new task:**
+1. Find tasks owned by THIS session only
+2. Mark only THOSE as PAUSED
+3. NEVER touch other sessions' tasks
+
+## When to Auto-Activate
+
+**Checking Other Work:**
+- "What else is being worked on?"
+- "What are other sessions doing?"
+- "Is anyone working on X?"
+
+**Switching/Handoff:**
+- "Switch to another task"
+- "Hand this off"
+- "Take over X task" / "Claim X"
+
+**Parallel Work:**
+- "In my other terminal..."
+- "I have another session..."
 
 ## Session Identification
 
-Each Claude Code instance has a unique session ID:
-- Available via `$CLAUDE_SESSION_ID` environment variable
-- If not set, generate from: `default-$(date +%s)-$$`
-- Used to isolate state between instances
+```bash
+# Get current session ID
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 
-## Task Ownership Rules
+# This session's state file
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
 
-1. **Exclusive Ownership**: Each task has ONE active session at a time
-2. **ACTIVE**: Session is currently working on the task
-3. **PAUSED**: Task on hold, available for claim
-4. **STALE**: No activity >24 hours, can be reclaimed
-5. **QUICK_FIX**: Temporary access without changing ownership
+## Task Registry Structure
 
-## Detecting Other Sessions
+`.claude/state/active-tasks.md`:
+
+```markdown
+## Currently Active
+
+| Task ID | Session | Status | Started | Phase |
+|---------|---------|--------|---------|-------|
+| task-1  | abc123  | IN_PROGRESS | 2026-01-14 | Phase 2 |
+| task-2  | def456  | IN_PROGRESS | 2026-01-14 | Phase 1 |
+
+## Paused / Available
+
+| Task ID | Last Session | Status | Paused At |
+|---------|--------------|--------|-----------|
+| task-3  | abc123       | PAUSED | 2026-01-14 |
+```
+
+## Modifying the Registry
+
+### Adding a New Task
 
 ```bash
-# List all active sessions
-ls -la .claude/state/sessions/session-*.md
+# ONLY add a row, don't modify existing rows
+# Add to "Currently Active" section
 
-# Find sessions working on specific task
-grep -l "task-id" .claude/state/sessions/*.md
-
-# Check session activity (file modification time)
-find .claude/state/sessions -name "*.md" -mtime -1  # Active in last 24h
-find .claude/state/sessions -name "*.md" -mtime +1  # Stale (>24h)
+| new-task | $SESSION_ID | IN_PROGRESS | $(date) | Phase 1 |
 ```
 
-## Coordination Workflows
-
-### Switching Tasks
-
-When user wants to switch to a different task:
-
-1. Save current task state (`/save-state`)
-2. Mark current task as PAUSED in registry
-3. Claim or create new task
-4. Load new task state
-
-### Parallel Work
-
-When user has multiple terminals:
-
-1. Each terminal gets its own session file
-2. Each works on different task (enforced by registry)
-3. Show other sessions' status via `/active-tasks`
-4. Handoffs via `/release-task` and `/claim-task`
-
-### Handoff Between Sessions
-
-When passing work to another session/terminal:
-
-1. Source session: `/release-task` (saves state, marks PAUSED)
-2. Creates handoff file with resume instructions
-3. Target session: `/claim-task <id>` (loads state, marks ACTIVE)
-4. Updates registry ownership
-
-## Conflict Prevention
-
-### Same Task, Multiple Sessions
-
-If user tries to claim an ACTIVE task:
-
-```
-⚠️ Task is currently active in another session
-
-Options:
-1. Claim anyway (may conflict)
-2. Quick fix mode (temporary, no ownership change)
-3. Wait for release
-4. Cancel
-```
-
-### State File Conflicts
-
-Session files are isolated by session ID, preventing direct conflicts.
-Only `active-tasks.md` is shared, and updates are additive.
-
-## Stale Session Handling
-
-Sessions inactive for >24 hours are considered stale:
+### Pausing Your Own Task
 
 ```bash
-# Find stale sessions
-find .claude/state/sessions -name "*.md" -mtime +1
-
-# Check last update in file
-grep "^Updated:" .claude/state/sessions/session-*.md
+# Find YOUR task (match session ID)
+# Move from "Currently Active" to "Paused / Available"
+# Change status to PAUSED
+# Add paused timestamp
 ```
 
-When encountering a stale session:
-1. Offer to claim the task
-2. Show what was being worked on
-3. Create handoff note on claim
+### Claiming a Paused Task
 
-## Quick Reference
+```bash
+# Remove from "Paused / Available"
+# Add to "Currently Active" with YOUR session ID
+# Change status to IN_PROGRESS
+```
+
+## Common Workflows
+
+### Check What's Active
+
+```
+User: "What's being worked on?"
+
+1. Read active-tasks.md
+2. Show all active tasks
+3. Highlight which is THIS session's task
+4. Show session IDs for context
+```
+
+### Create New Task (Session-Safe)
+
+```
+User: /new-task feature-x
+
+1. SESSION_ID = $CLAUDE_SESSION_ID
+2. Find tasks where Session = $SESSION_ID
+3. Mark ONLY those as PAUSED (move to Paused section)
+4. Create new task owned by $SESSION_ID
+5. Add to Currently Active with $SESSION_ID
+6. Other sessions' tasks UNCHANGED
+```
+
+### Hand Off to Another Session
+
+```
+Terminal 1 (session abc123):
+  /release-task
+  → Marks task-1 as PAUSED
+  → Moves to "Paused / Available"
+  → Only affects abc123's task
+
+Terminal 2 (session def456):
+  /claim-task task-1
+  → Removes from "Paused / Available"
+  → Adds to "Currently Active" with def456
+  → task-2 (if def456 owns one) unchanged
+```
+
+### Parallel Development
+
+```
+Terminal 1 (abc123): /new-task auth-api
+Terminal 2 (def456): /new-task payment-api
+
+Registry shows:
+| auth-api    | abc123 | IN_PROGRESS | ... |
+| payment-api | def456 | IN_PROGRESS | ... |
+
+Both work independently. Neither affects the other.
+```
+
+## Ownership Validation
+
+Before ANY status change:
+
+```bash
+TASK_SESSION=$(grep "$TASK_ID" active-tasks.md | awk '{print $2}')
+
+if [ "$TASK_SESSION" != "$SESSION_ID" ]; then
+    # This task is NOT ours
+    if [ "$STATUS" = "PAUSED" ]; then
+        # Can claim paused tasks
+        echo "Claiming paused task..."
+    else
+        # Cannot modify active task owned by another
+        echo "ERROR: Task owned by session $TASK_SESSION"
+        echo "Use /claim-task if they release it"
+        exit 1
+    fi
+fi
+```
+
+## Quick Commands
 
 | Action | Command |
 |--------|---------|
 | See all tasks | `/active-tasks` |
-| Take over task | `/claim-task <id>` |
+| Take over paused task | `/claim-task <id>` |
 | Pause for handoff | `/release-task` |
 | Complete task | `/complete-task` |
-| New task | `/new-task <n>` |
 
-## Integration with Other Skills
+## Conflict Prevention
 
-- **session-state**: Handles per-session state saving/loading
-- **task-management**: Handles task creation and progress tracking
-- **context-monitor**: Helps manage context when switching tasks
+If trying to claim an ACTIVE task:
 
-## Error Handling
+```
+⚠️ Task 'auth-api' is active in session abc123.
 
-| Situation | Response |
-|-----------|----------|
-| No other sessions | "You're the only active session" |
-| Task not found | Suggest `/active-tasks` |
-| Already owned by self | "You already own this task" |
-| Network of sessions | Show all with status indicators |
+Options:
+1. Ask them to /release-task first
+2. Wait for them to complete
+3. Work on a different task
 
-## Example Interactions
+Cannot forcibly claim active tasks.
+```
 
-**User**: "What else is being worked on?"
-→ Read `active-tasks.md`, list all tasks with owners and status
+## Integration
 
-**User**: "I need to switch to the payment task"
-→ Save current state, offer to claim payment task, show handoff
+- **session-state**: Handles state for each session
+- **task-management**: Creates tasks with ownership
+- **context-monitor**: Manages context per session
 
-**User**: "Can someone else take over this task?"
-→ Run `/release-task`, mark as PAUSED, show instructions for claiming
+## Key Principle
 
-**User**: "Is anyone working on the auth task?"
-→ Check registry for auth task, show owner session and status
+> Each session is independent. Tasks have owners.
+> Only modify what you own. Claim what's released.

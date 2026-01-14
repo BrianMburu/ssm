@@ -1,89 +1,103 @@
 ---
 name: context-monitor
-description: Monitors context usage and provides proactive recommendations. Use when context might be getting high, when loading many files, or when user asks about context or memory usage.
-allowed-tools: Read, Bash(cat:*), Bash(wc:*)
+description: Monitors context usage and warns about limits. Activates on "context", "memory", "tokens", "how much space", "running out of", "almost full", or when loading many files.
+allowed-tools: Read, Bash(wc:*)
 ---
 
 # Context Monitor Skill
 
-This skill helps manage context window usage proactively.
+Proactively manages context window usage to prevent degradation.
 
-## When to Activate
+## When to Auto-Activate
 
-Automatically activate when:
-- Loading multiple files
-- User mentions "context", "memory", or "tokens"
-- Working on a task for extended time
-- Before large file reads
+**Direct Questions:**
+- "How's my context?" / "Context usage?"
+- "How much memory/space left?"
+- "Am I running low on tokens?"
+- "Is context almost full?"
 
-## Using Built-in `/context`
+**Implicit Triggers:**
+- Loading multiple large files
+- Working for extended time without clearing
+- Before reading a very large file
 
-Claude Code has a built-in `/context` command that shows context usage as a colored grid. **Use this first** for accurate readings.
+## Quick Status Check
 
+Use Claude Code's built-in command:
 ```
 /context
 ```
 
-## Warning Thresholds
+Shows colored grid with current usage.
 
-| Level | Percentage | Recommendation |
-|-------|------------|----------------|
-| 🟢 Green | < 60% | Normal operation |
-| 🟡 Yellow | 60-70% | Be mindful of new loads |
-| 🟠 Orange | 70-80% | Finish current step, then save |
-| 🔴 Red | 80-90% | Save state immediately |
-| ⚫ Critical | > 90% | Emergency save, auto-compact imminent |
+## Warning Thresholds (Adjusted for 45k Buffer)
 
-## Context-Efficient Practices
+**CRITICAL**: Auto-compact buffer is ~45k tokens (22.5%). Danger zone starts at 77.5%.
 
-### Load Priority
+| Level | Range | Tokens | Action |
+|-------|-------|--------|--------|
+| Green | < 50% | < 100k | Normal work |
+| Notice | 50-60% | 100-120k | Good checkpoint opportunity |
+| Warning | 60-70% | 120-140k | Plan to save soon |
+| **Strong** | 70-75% | 140-150k | Finish step, then save+clear |
+| **CRITICAL** | > 75% | > 150k | **SAVE NOW** - 5k to danger |
+| Danger | > 77.5% | > 155k | In buffer zone - too late |
 
-1. **Essential** - Files being directly modified
-2. **Reference** - Load on demand, unload after
-3. **Never Load** - Deprecated or processed files
-
-### Token Estimation
-
-Rough estimate: ~4 characters per token
-
-```bash
-# Estimate file tokens
-wc -c filename | awk '{print int($1/4) " tokens (est.)"}'
-```
-
-### Smart Loading
-
-- Use line ranges when possible: `Read file.ts:10-50`
-- Load types/interfaces before implementations
-- Skip files marked "Do NOT Load" in active.md
+**Why 75% not 90%?** The old thresholds were wrong. At 80% you're already in danger.
 
 ## When Context is High
 
-1. **Don't panic** - Complete current atomic action
-2. **Save state** - Run `/save-state` command
-3. **Clear context** - Run `/clear`
-4. **State auto-loads** - Session-start hook reloads state
+1. **Complete current step** (don't leave work half-done)
+2. **Run `/save-state`** to preserve progress
+3. **Run `/clear`** to start fresh
+4. State auto-reloads on new session
 
-## Context Registry
+## Auto-Protection
 
-The `.claude/state/context-registry.md` tracks file relevance per task:
-- Essential files (always load)
-- Reference files (on demand)
-- Deprecated files (never load)
+SSM provides automatic protection:
+- **PreCompact hook**: Blocks compaction entirely
+- **Context-check hook**: Warns at 50%, 60%, 70%, 75% (auto-save at 75%)
+- **PreToolUse hook**: Auto-tracks working files
 
-Update this as you work to help future sessions.
+## Efficient Practices
 
-## Avoiding Auto-Compaction
+**Do:**
+- Load only files you're actively editing
+- Use line ranges: `Read file.ts:10-50`
+- Unload files after using them
+- Use Explorer subagent for research (isolates context)
 
-Auto-compaction degrades context quality. Prevent it by:
-1. Monitoring context proactively
-2. Saving state before 80%
-3. Using `/clear` for fresh context
-4. Letting session-start hook reload state
+**Don't:**
+- Load entire directories
+- Keep research docs after research
+- Load files "just in case"
 
-## Integration Notes
+## Subagents for Context Isolation
 
-- `/context` - Built-in, use for accurate readings
-- `/compact` - Avoid if possible, degrades quality
-- `/clear` - Preferred for fresh start
-- `/continue-task` - Our command to reload task state
+When you need to explore the codebase, use the Explorer subagent to keep exploration noise out of main context:
+
+```
+Task tool:
+- subagent_type: "Explore"
+- prompt: "Find all files related to X and summarize"
+- model: "haiku" (faster for simple searches)
+```
+
+Only the summary returns to main context, not all the files read during exploration.
+
+## Token Estimation
+
+Rough guide: ~4 characters = 1 token
+
+```bash
+# Estimate file size
+wc -c file.ts  # Divide by 4 for tokens
+```
+
+## Key Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/context` | View current usage |
+| `/save-state` | Save before clearing |
+| `/clear` | Fresh context |

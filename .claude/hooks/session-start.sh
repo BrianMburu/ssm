@@ -1,10 +1,10 @@
 #!/bin/bash
 #
 # Session Start Hook - Multi-Instance Aware
-# Loads session-specific state when session starts (startup|resume|clear|compact)
+# Loads session-specific state and syncs progress to TodoWrite
 #
 # Input: JSON with source field
-# Output: JSON with additionalContext to inject
+# Output: JSON with systemMessage to inject
 #
 
 # DO NOT use set -e - hooks must always return valid JSON
@@ -12,7 +12,6 @@
 # Helper function to escape string for JSON
 json_escape() {
     local str="$1"
-    # Escape backslashes first, then quotes, then convert newlines
     str="${str//\\/\\\\}"
     str="${str//\"/\\\"}"
     str="${str//$'\n'/\\n}"
@@ -47,7 +46,7 @@ SESSION_STATE="$SESSION_DIR/session-$SESSION_ID.md"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 ACTIVE_TASKS="$PROJECT_DIR/.claude/state/active-tasks.md"
 
-# Ensure session directory exists (silently)
+# Ensure session directory exists
 mkdir -p "$SESSION_DIR" 2>/dev/null || true
 
 # Determine which state file to use
@@ -66,18 +65,21 @@ fi
 if [ -z "$STATE_FILE" ]; then
     CONTEXT="📋 NEW SESSION (session: $SESSION_ID)
 
-Ready to start! Use /new-task <name> to begin.
+No active task. Start with:
+  /new-task <name> - Create a new task
+  /active-tasks    - See all tasks
+  /claim-task <id> - Take over a paused task
 
-Commands:
-- /new-task <name> - Start a new task
-- /active-tasks - See all tasks
-- /task-history - View completed tasks"
-    
+Context thresholds (IMPORTANT):
+  < 70%  - Safe to work
+  70-75% - Save soon
+  > 75%  - SAVE NOW (danger at 77.5%)"
+
     output_json "$CONTEXT"
     exit 0
 fi
 
-# Extract key information from state file (with safe defaults)
+# Extract key information from state file
 CURRENT_TASK=$(grep -A1 "^## Current Task" "$STATE_FILE" 2>/dev/null | tail -1 | tr -d '[:space:]' || echo "none")
 [ -z "$CURRENT_TASK" ] && CURRENT_TASK="none"
 
@@ -94,7 +96,7 @@ LAST_ACTION=$(grep "^LAST_ACTION:" "$STATE_FILE" 2>/dev/null | cut -d':' -f2- | 
 CONTEXT_FILES=$(grep -A10 "^## Immediate Context" "$STATE_FILE" 2>/dev/null | grep "^- " | head -5 | sed 's/^- /  - /' || echo "  - No files listed")
 [ -z "$CONTEXT_FILES" ] && CONTEXT_FILES="  - No files listed"
 
-# Extract next steps (first 3 only)  
+# Extract next steps (first 3 only)
 NEXT_STEPS=$(grep -A5 "^## Next Steps" "$STATE_FILE" 2>/dev/null | grep -E "^[0-9]|^\[" | head -3 || echo "No next steps defined")
 [ -z "$NEXT_STEPS" ] && NEXT_STEPS="No next steps defined"
 
@@ -105,12 +107,44 @@ if [ "$BLOCKED" = "Yes" ]; then
     BLOCKERS=$(grep -A5 "^## Blockers" "$STATE_FILE" 2>/dev/null | grep "^- " | head -3 || true)
 fi
 
+# Get progress from progress.md if task exists
+PROGRESS_INFO=""
+PROGRESS_SYNC_NOTE=""
+if [ "$CURRENT_TASK" != "none" ] && [ -f "$PROJECT_DIR/tasks/$CURRENT_TASK/progress.md" ]; then
+    PROGRESS_FILE="$PROJECT_DIR/tasks/$CURRENT_TASK/progress.md"
+    TOTAL=$(grep -c '^\- \[' "$PROGRESS_FILE" 2>/dev/null || echo 0)
+    DONE=$(grep -c '^\- \[x\]' "$PROGRESS_FILE" 2>/dev/null || echo 0)
+
+    if [ "$TOTAL" -gt 0 ]; then
+        PERCENT=$((DONE * 100 / TOTAL))
+        PROGRESS_INFO="Progress: $DONE/$TOTAL steps ($PERCENT%)"
+        PROGRESS_SYNC_NOTE="
+
+NOTE: Sync progress.md to TodoWrite with /task-status"
+    fi
+fi
+
+# Check for other active tasks across sessions
+OTHER_TASKS=""
+if [ -f "$ACTIVE_TASKS" ]; then
+    OTHER_COUNT=$(grep -c "IN_PROGRESS" "$ACTIVE_TASKS" 2>/dev/null || echo 0)
+    if [ "$OTHER_COUNT" -gt 1 ]; then
+        OTHER_TASKS="
+
+Other active tasks: $((OTHER_COUNT - 1)) (use /active-tasks to see all)"
+    elif [ "$OTHER_COUNT" -eq 1 ] && [ "$CURRENT_TASK" = "none" ]; then
+        OTHER_TASKS="
+
+1 active task exists (use /active-tasks to see)"
+    fi
+fi
+
 # Build the context message
 CONTEXT="SESSION STATE LOADED ($STATE_TYPE)
 
-Current Task: $CURRENT_TASK
+Task: $CURRENT_TASK
 Phase: $PHASE
-Last Action: $LAST_ACTION
+$PROGRESS_INFO
 
 Current Focus:
 $CURRENT_FOCUS
@@ -125,12 +159,26 @@ $NEXT_STEPS"
 if [ -n "$BLOCKERS" ]; then
     CONTEXT="$CONTEXT
 
-BLOCKERS DETECTED:
+⚠️ BLOCKERS:
 $BLOCKERS"
 fi
 
+# Add other tasks info
+if [ -n "$OTHER_TASKS" ]; then
+    CONTEXT="$CONTEXT
+$OTHER_TASKS"
+fi
+
+# Add progress sync note
+if [ -n "$PROGRESS_SYNC_NOTE" ]; then
+    CONTEXT="$CONTEXT
+$PROGRESS_SYNC_NOTE"
+fi
+
+# Add context warning reminder
 CONTEXT="$CONTEXT
 
-Commands: /continue-task | /task-status | /active-tasks"
+Context Limits: 70% warning | 75% CRITICAL | 77.5% danger
+Commands: /task-status | /save-state | /active-tasks"
 
 output_json "$CONTEXT"

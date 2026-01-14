@@ -103,13 +103,41 @@ Update `.claude/state/active-tasks.md`:
    - Number of sessions
    - Outcome (✅ Success)
 
-## Step 6: Clear Session State
+## Step 6: Update Session State File (CRITICAL)
 
-Update current session state:
-- Set Current Task to "none"
-- Clear Working Files
-- Clear Current Focus
-- Add completion entry to Session Log
+**IMPORTANT**: You MUST update the session state file to clear the current task.
+The status line reads from this file, so it will show stale data if not updated.
+
+1. Determine the session state file:
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
+
+2. Update these fields in the session state file:
+   - **Current Task**: Set to `None`
+   - **PHASE**: Set to `Idle`
+   - **LAST_ACTION**: Set to `Completed <task-id>`
+   - **Current Focus**: Set to `No active task. Ready for new work.`
+   - **Immediate Context**: Clear or set to `(none - no active task)`
+   - **Session Log**: Add completion entry with timestamp
+
+Example of updated session state:
+```markdown
+## Current Task
+None
+
+## Status
+PHASE: Idle
+STEP: -
+BLOCKED: No
+LAST_ACTION: Completed <task-id>
+
+## Current Focus
+No active task. Ready for new work.
+```
+
+**This step is essential** - without it, the status line will continue showing the completed task as active.
 
 ## Step 7: Offer Next Steps
 
