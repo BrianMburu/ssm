@@ -17,7 +17,7 @@ Use this when:
 
 ```bash
 # Get current session's task
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 SESSION_FILE=".claude/state/sessions/session-$SESSION_ID.md"
 
 if [ -f "$SESSION_FILE" ]; then
@@ -89,27 +89,48 @@ Update `tasks/<task-id>/progress.md`:
 
 ## Step 5: Update Registry
 
-Update `.claude/state/active-tasks.md`:
+Update `.claude/state/active-tasks.md` to release the task.
 
-Move task from "Currently Active" to "Paused Tasks":
-
-```markdown
-## Paused Tasks
-
-| Task ID | Last Session | Paused Since | Phase | Reason |
-|---------|--------------|--------------|-------|--------|
-| <task-id> | <session-id> | <timestamp> | <phase> | Released for handoff |
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 734239
 ```
 
-## Step 6: Clear Session State
+**Then update the registry:**
+1. Remove the task row from "Currently Active" table
+2. Add a row to "Paused Tasks" table with the NUMERIC session ID
 
-Update current session:
-- Set Current Task to "none"
+**⚠️ CRITICAL**: In the "Last Session" column, write the actual NUMERIC
+session ID (e.g., "734239"), NOT literal words like "current" or "this".
+
+**Example - Add to Paused Tasks:**
+```markdown
+| Task ID | Last Session | Paused Since | Phase | Reason |
+|---------|--------------|--------------|-------|--------|
+| my-task | 734239 | 2026-01-14T15:30:00+03:00 | Phase 2 | Released for handoff |
+```
+Note: "734239" is the actual numeric session ID that released the task.
+
+## Step 6: Clear Session State (CRITICAL)
+
+Determine session state file:
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
+
+Update `$SESSION_STATE`:
+- Set Current Task to "None"
+- Set PHASE to "Idle"
+- Set LAST_ACTION to "Released task <task-id>"
+- Set Current Focus to "No active task. Ready for new work."
 - Clear Working Files
-- Add release entry to Session Log
+- Clear Immediate Context
+- Add release entry to Session History:
 
 ```markdown
-| <timestamp> | Released Task | Released <task-id> for other sessions |
+| <timestamp> | Task released | Released <task-id> for other sessions |
 ```
 
 ## Step 7: Confirm Release

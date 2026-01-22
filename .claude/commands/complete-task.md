@@ -93,6 +93,12 @@ cp .claude/state/sessions/session-*.md "$ARCHIVE_DIR/sessions/" 2>/dev/null || t
 
 ## Step 5: Update Registry
 
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+```
+
 Update `.claude/state/active-tasks.md`:
 
 1. Remove task from "Currently Active" table
@@ -100,8 +106,11 @@ Update `.claude/state/active-tasks.md`:
    - Task ID
    - Completion date
    - Duration
-   - Number of sessions
+   - Number of sessions (use numeric IDs like "828334", not "current")
    - Outcome (✅ Success)
+
+**⚠️ CRITICAL**: If recording session IDs anywhere, use the actual NUMERIC
+session ID (e.g., "828334"), NOT literal words like "current" or "this".
 
 ## Step 6: Update Session State File (CRITICAL)
 
@@ -110,7 +119,7 @@ The status line reads from this file, so it will show stale data if not updated.
 
 1. Determine the session state file:
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ```
 

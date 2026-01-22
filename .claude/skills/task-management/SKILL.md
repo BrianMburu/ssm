@@ -65,18 +65,35 @@ Create ALL files using templates from `tasks/.templates/`:
 
 ### 2. Register in active-tasks.md
 
-Add row to "Currently Active" table with your session ID:
-
-```markdown
-| <task-id> | session-<id> | IN_PROGRESS | <timestamp> | <goal> |
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
 ```
 
-### 3. Update Session State
+Add row to "Currently Active" table with the NUMERIC session ID:
 
-Update `.claude/state/active.md`:
-- Set Current Task
+```markdown
+| <task-id> | 828334 | IN_PROGRESS | <timestamp> | <goal> |
+```
+(Replace 828334 with your actual `$SESSION_ID` numeric value)
+
+**⚠️ CRITICAL**: Always use the NUMERIC session ID (e.g., "828334"), NEVER
+literal words like "current", "new", or "session-id". Literals cause collisions.
+
+### 3. Update Session State (CRITICAL)
+
+**IMPORTANT**: Update the SESSION-SPECIFIC state file:
+```bash
+SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+```
+
+Update `$SESSION_STATE` with:
+- Set Current Task to <task-id>
+- Set LAST_ACTION to "Created task <task-id>"
 - Set Current Focus to first step
 - Add task files to Immediate Context
+- Add entry to Session History table
 
 ### 4. Initialize TodoWrite from progress.md
 
@@ -123,8 +140,11 @@ Keep TodoWrite in sync with progress.md:
 
 When user asks about status:
 
-1. Read `.claude/state/active.md` for current task
-2. **Read `tasks/<id>/progress.md`** for actual progress
+1. Read session state for current task:
+   ```bash
+   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+   ```
+2. **Read `tasks/<id>/progress.md`** for actual progress (source of truth)
 3. Read `tasks/<id>/plan.md` for phase details
 4. Report: task name, phase, completed steps, next step
 
@@ -209,10 +229,45 @@ Tracked tasks preserve progress across context clears.
 - Clarification questions
 - Documentation reads
 
+## Post-Action State Sync (CRITICAL)
+
+**After EVERY significant action, update session state.**
+
+Determine session state file:
+```bash
+SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+```
+
+### After Completing a Step
+
+1. Update `progress.md` with `[x]`
+2. Update `$SESSION_STATE`:
+   - Set LAST_ACTION to describe completed step
+   - Update Current Focus to next step
+   - Add entry to Session History
+3. Update TodoWrite to match progress.md
+
+### After Creating a Task
+
+Update `$SESSION_STATE`:
+- Current Task: <task-id>
+- LAST_ACTION: "Created task <task-id>"
+- Current Focus: First step
+- Session History: Add creation entry
+
+### After Completing a Task
+
+Update `$SESSION_STATE`:
+- Current Task: None
+- PHASE: Idle
+- LAST_ACTION: "Completed <task-id>"
+- Current Focus: "No active task. Ready for new work."
+- Session History: Add completion entry
+
 ## Key Principles
 
 1. **Session ownership** - Never modify other sessions' tasks
 2. **progress.md is truth** - TodoWrite is UI mirror only
 3. **Full structure** - Create all files upfront
 4. **Large tasks span sessions** - This is normal, not failure
-5. **Sync after changes** - Always update both progress.md AND TodoWrite
+5. **Sync after changes** - Always update progress.md, TodoWrite, AND session state

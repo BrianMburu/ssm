@@ -23,7 +23,7 @@ TRIGGER=$(echo "$INPUT" | grep -o '"trigger"[[:space:]]*:[[:space:]]*"[^"]*"' | 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 TIMESTAMP=$(date -Iseconds 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)
-SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 
 # Helper: Create emergency handoff file
 create_emergency_handoff() {

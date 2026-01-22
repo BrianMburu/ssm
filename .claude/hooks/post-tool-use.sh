@@ -27,7 +27,7 @@ INPUT=$(cat)
 
 # Get environment
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 TIMESTAMP=$(date -Iseconds 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)
 
 # State files

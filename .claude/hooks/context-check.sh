@@ -91,7 +91,7 @@ CHECKPOINT
 INPUT=$(cat)
 
 # Get session ID for per-session tracking
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
 # Multiple ways to get context percentage

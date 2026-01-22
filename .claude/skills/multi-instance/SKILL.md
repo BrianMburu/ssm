@@ -43,11 +43,17 @@ Each session can ONLY:
 
 ```bash
 # Get current session ID
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
 
 # This session's state file
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ```
+
+**⚠️ CRITICAL**: The session ID is a NUMERIC value (e.g., "828334", "734239").
+When writing session IDs to the registry or state files, ALWAYS use the actual
+numeric value, NEVER literal words like "current", "new", "this", or "default".
+Using literal strings causes session collisions between multiple Claude instances.
 
 ## Task Registry Structure
 

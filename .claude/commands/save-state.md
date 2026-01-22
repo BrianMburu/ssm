@@ -19,7 +19,7 @@ This command saves to session-specific state files:
 
 ```bash
 # Get current session ID
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 SESSION_FILE=".claude/state/sessions/session-$SESSION_ID.md"
 
 # Ensure directory exists
@@ -36,9 +36,15 @@ Identify what needs to be saved:
 4. **Key Decisions**: What important decisions were made?
 5. **Next Steps**: What should happen next?
 
-## Step 3: Update Session State File
+## Step 3: Update Session State File (CRITICAL)
 
-Create or update `.claude/state/sessions/session-<id>.md`:
+Determine session state file:
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
+
+Create or update `$SESSION_STATE`:
 
 ```markdown
 # Session State: <session-id>
@@ -54,7 +60,7 @@ Terminal: <terminal identifier if known>
 PHASE: <Current phase name>
 STEP: <X> of <Y>
 BLOCKED: <Yes/No>
-LAST_ACTION: <Most recent completed action>
+LAST_ACTION: State saved for <task-id>
 
 ## Immediate Context (Load These)
 - <path/to/file1.ts> (reason)
@@ -88,11 +94,29 @@ LAST_ACTION: <Most recent completed action>
 
 ## Step 4: Update Active Tasks Registry
 
-Update `.claude/state/active-tasks.md` to reflect current state:
+Update `.claude/state/active-tasks.md` to reflect the task's current state.
 
-1. Find the row for current task
-2. Update the Phase column
-3. Update any status changes
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 734239
+```
+
+**Then update the registry row for this task:**
+- Find the row matching `$TASK_ID`
+- Update Phase column to current phase (e.g., "Phase 2")
+- Keep Session column as the NUMERIC `$SESSION_ID` value (e.g., "734239")
+
+**⚠️ CRITICAL**: When updating the Session column, use the actual NUMERIC
+session ID (e.g., "734239", "828334"). NEVER write literal words like
+"current", "this", or "active" - these cause session collisions.
+
+**Example Edit:**
+```
+Old: | my-task | 734239 | 2026-01-14 | Phase 1 | IN_PROGRESS |
+New: | my-task | 734239 | 2026-01-14 | Phase 2 | IN_PROGRESS |
+```
+The session ID stays as the numeric value - only the phase changes.
 
 ## Step 5: Update Task Progress (If Applicable)
 

@@ -24,7 +24,7 @@ fi
 
 # Get project directory
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 TRACKING_FILE="/tmp/ssm-modified-files-$SESSION_ID.txt"
 
 # Track the file if we found a path

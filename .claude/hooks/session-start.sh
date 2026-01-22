@@ -40,7 +40,7 @@ SOURCE=$(echo "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' | cu
 
 # Get project directory and session ID
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 SESSION_DIR="$PROJECT_DIR/.claude/state/sessions"
 SESSION_STATE="$SESSION_DIR/session-$SESSION_ID.md"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"

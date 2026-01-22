@@ -8,6 +8,7 @@ A structured context and task management system that prevents context loss durin
 - **Auto-Save on Edits**: Working files automatically tracked after every edit
 - **Context Warnings**: Proactive alerts at 50%, 60%, 70%, 75% thresholds (auto-save at 75%)
 - **Full Task Structure**: Rich task files with progress.md as source of truth
+- **Session State Sync**: Every action updates session state (LAST_ACTION) for accurate status display
 - **Multi-Instance Support**: Run multiple Claude Code terminals with session ownership rules
 - **Session Isolation**: Each instance has its own state file - no conflicts
 - **Task Registry**: Central tracking of all active, paused, and completed tasks
@@ -365,9 +366,25 @@ Central tracking of all tasks:
 - Run `/task-status` to sync progress.md to TodoWrite
 - Update progress.md first, then sync
 
+## Documentation
+
+See the `docs/` folder for detailed documentation:
+
+- [State Flow Diagrams](docs/SSM-State-Flow-Diagrams.md) - Visual guide to task lifecycle and multi-session handoffs
+- [Compatibility Report](docs/SSM-Compatibility-Report.md) - Integration details
+- [Hypothetical Examples](docs/SSM-Hypothetical-Examples.md) - Usage scenarios
+- [Multi-Instance Task Completion](docs/SSM-MultiInstance-TaskCompletion.md) - Coordination patterns
+
 ## Version History
 
-### v2.0 (Current)
+### v2.1 (Current)
+- **Session State Sync Fix**: All commands now update session-specific state files
+- **LAST_ACTION Tracking**: Every significant action updates LAST_ACTION for accurate status display
+- **Fixed File References**: Commands now correctly target `session-<id>.md` instead of `active.md`
+- **Post-Action Sync**: Skills include explicit guidance to sync session state after actions
+- **State Flow Documentation**: Added visual diagrams showing complete task lifecycle
+
+### v2.0
 - New context thresholds: 50%, 60%, 70%, 75% (was 70%, 80%, 90%)
 - `progress.md` as source of truth (not TodoWrite)
 - Full task structure created by default (5 files)

@@ -10,7 +10,7 @@
 # DO NOT use set -e - status script must always output something
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 SESSION_STATE="$PROJECT_DIR/.claude/state/sessions/session-$SESSION_ID.md"
 CONTEXT_FILE="/tmp/claude-context-pct-$SESSION_ID.txt"

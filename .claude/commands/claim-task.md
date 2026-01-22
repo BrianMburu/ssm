@@ -109,23 +109,52 @@ Save to: `tasks/<task-id>/handoffs/handoff-<timestamp>.md`
 
 ## Step 6: Update Registry
 
-Update `.claude/state/active-tasks.md`:
+Update `.claude/state/active-tasks.md` to transfer ownership.
 
-1. Change the Session column to current session ID
-2. Update the Status to ACTIVE
-3. Add handoff note to task's history
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+```
 
-## Step 7: Update Session States
+**Then update the registry row for the claimed task:**
+1. Find the row for `$ARGUMENTS` (the task being claimed)
+2. Change Session column to the NUMERIC `$SESSION_ID` value (e.g., "828334")
+3. Update Status to "IN_PROGRESS"
+
+**⚠️ CRITICAL**: When updating the Session column, write the actual NUMERIC
+session ID (e.g., "828334"), NOT literal words like "current", "new", or
+"this session". Literal strings cause multi-session collisions.
+
+**Example Edit:**
+```
+Old: | my-task | 734239 | 2026-01-14 | Phase 2 | PAUSED |
+New: | my-task | 828334 | 2026-01-14 | Phase 2 | IN_PROGRESS |
+```
+Note: 828334 is the NEW session's numeric ID, replacing the old session's ID.
+
+## Step 7: Update Session States (CRITICAL)
+
+Determine session state files:
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+CURRENT_SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
 
 **Previous session** (if exists):
-- Set Current Task to "none"
+- Set Current Task to "None"
+- Set LAST_ACTION to "Task claimed by session-<new-session>"
 - Add log entry: "Task claimed by <new-session>"
 
-**Current session**:
+**Current session** (update `$CURRENT_SESSION_STATE`):
 - Set Current Task to claimed task ID
+- Set LAST_ACTION to "Claimed task <task-id> from <prev-session>"
 - Copy Phase, Step, Focus from previous session
 - Load Immediate Context files
-- Add log entry: "Claimed task from <prev-session>"
+- Add entry to Session History table:
+  ```markdown
+  | <timestamp> | Task claimed | Claimed <task-id> from <prev-session> |
+  ```
 
 ## Step 8: Present Context
 

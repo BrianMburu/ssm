@@ -26,7 +26,7 @@ INPUT=$(cat)
 
 # Get project directory and session info
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 
 # Default: allow stop

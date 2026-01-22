@@ -28,8 +28,20 @@ Maintains task continuity across sessions by managing state files.
 
 ## State File Location
 
-Primary: `.claude/state/active.md`
-Per-session: `.claude/state/sessions/session-<id>.md`
+**Default**: `.claude/state/sessions/session-<id>.md` (session-specific)
+**Fallback**: `.claude/state/active.md` (only if session ID unavailable)
+
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+```
+
+**Always use session-specific files for multi-instance support.**
+
+**⚠️ CRITICAL**: When writing session IDs to files (state files, registry, etc.),
+always use the actual NUMERIC session ID (e.g., "828334"), NEVER literal words
+like "current", "this", or "default". Literal strings cause multi-session collisions.
 
 ## Saving State (Quick)
 
@@ -59,16 +71,40 @@ Also update the todo list to reflect current progress.
 
 ## Loading State (Quick)
 
-1. Read `.claude/state/active.md`
-2. Show: Task, Phase, Current Focus
-3. Load files from "Immediate Context"
-4. Report: "Continuing <task>. Next: <focus>"
+1. Determine session state file:
+   ```bash
+   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+   ```
+2. Read `$SESSION_STATE` (fall back to `active.md` if not found)
+3. Show: Task, Phase, Current Focus
+4. Load files from "Immediate Context"
+5. Report: "Continuing <task>. Next: <focus>"
 
 ## Integration
 
 - **Auto-save**: PostToolUse hook tracks Working Files automatically
-- **Context warnings**: Hook warns at 70%, 80%, 90%
+- **Context warnings**: Hook warns at 50%, 60%, 70%, 75% (CRITICAL)
 - **Compaction blocked**: PreCompact hook blocks, suggests save+clear
+
+## State Sync Checklist
+
+After ANY significant action, update session state:
+
+```markdown
+LAST_ACTION: <what was just completed>
+Updated: <timestamp>
+```
+
+And add to Session History:
+```markdown
+| <timestamp> | <action> | <notes> |
+```
+
+**Significant actions requiring state sync:**
+- Task creation / completion
+- Task claim / release
+- Step completion
+- State save
 
 ## Key Commands
 

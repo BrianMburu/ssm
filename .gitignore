@@ -18,3 +18,6 @@ Thumbs.db
 
 # If using handoffs for very long sessions (optional - you may want to commit these)
 # tasks/*/handoffs/auto-handoff-*.md
+
+# CLAUDE instructions
+CLAUDE.md

@@ -38,7 +38,7 @@ Before creating, check if this session has an active task:
 ```bash
 TASK_ID="<extracted-task-id>"
 TIMESTAMP=$(date -Iseconds)
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 DATE=$(date +%Y-%m-%d)
 
 mkdir -p "tasks/$TASK_ID"
@@ -221,17 +221,35 @@ No decisions yet. Add as they arise.
 
 ## Step 4: Register Task
 
+**First, get the actual session ID:**
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+```
+
 Add to `.claude/state/active-tasks.md` under "Currently Active":
 
 ```markdown
-| <task-id> | <SESSION_ID> | IN_PROGRESS | <DATE> | Phase 1 |
+| <task-id> | 828334 | IN_PROGRESS | 2026-01-14 | Phase 1 |
 ```
+(Replace 828334 with your actual `$SESSION_ID` numeric value)
+
+**⚠️ CRITICAL**: The Session column MUST contain the actual NUMERIC session ID
+(e.g., "828334"), NOT literal words like "current", "new", or "default".
+Literal strings cause session collisions when running multiple instances.
 
 **Important**: Preserve all other rows. Only add this new row.
 
-## Step 5: Update Session State
+## Step 5: Update Session State (CRITICAL)
 
-Update `.claude/state/active.md`:
+**IMPORTANT**: Update the SESSION-SPECIFIC state file, not active.md.
+
+```bash
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+```
+
+Update `$SESSION_STATE` with:
 
 ```markdown
 ## Current Task
@@ -241,7 +259,7 @@ Update `.claude/state/active.md`:
 PHASE: Phase 1 - Research
 STEP: 1
 BLOCKED: No
-LAST_ACTION: Task created with full structure
+LAST_ACTION: Created task <task-id> with full structure
 
 ## Immediate Context (Load These)
 - tasks/<task-id>/plan.md
@@ -255,6 +273,11 @@ Begin Phase 1: Research and understand the codebase for <GOAL>
 1. [ ] **NEXT** → Explore relevant code
 2. [ ] Identify files to modify
 3. [ ] Document findings in context.md
+```
+
+Also add entry to Session History:
+```markdown
+| <timestamp> | Task created | Created <task-id> with full structure |
 ```
 
 ## Step 6: Initialize TodoWrite

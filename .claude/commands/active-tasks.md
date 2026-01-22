@@ -30,7 +30,7 @@ Each row represents a different task being worked on by a different session.
 ## Step 2: Get Current Session ID
 
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 echo "Current session: $SESSION_ID"
 ```
 
@@ -204,7 +204,7 @@ All clear! You can:
 
 ```bash
 # Get current session
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 
 # Check if task belongs to you
 OWNER=$(grep "<task-id>" .claude/state/active-tasks.md | awk -F'|' '{print $3}' | xargs)

@@ -14,7 +14,7 @@ The TodoWrite UI may lag behind actual progress.
 ## Step 1: Determine Session and State File
 
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ACTIVE_STATE=".claude/state/active.md"
 
