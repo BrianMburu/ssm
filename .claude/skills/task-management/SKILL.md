@@ -97,20 +97,43 @@ Update `$SESSION_STATE` with:
 
 ### 4. Initialize TodoWrite from progress.md
 
-Read `progress.md` and sync to TodoWrite:
+**This skill auto-syncs progress.md to TodoWrite after task creation.**
+
+Read `progress.md` checkboxes and create matching todos:
 
 ```javascript
-// Read progress.md checkboxes, then create matching todos
+// Example: Sync progress.md to TodoWrite
 TodoWrite([
   { content: "Phase 1: Research", status: "in_progress", activeForm: "Researching" },
   { content: "Phase 2: Implementation", status: "pending", activeForm: "Implementing" },
-  { content: "Phase 3: Testing", status: "pending", activeForm: "Testing" }
+  { content: "Phase 3: Testing", status: "pending", activeForm: "Testing" },
+  { content: "Phase 4: Cleanup", status: "pending", activeForm: "Cleaning up" }
 ])
 ```
 
 ### 5. Start Working
 
 After setup, begin work on first phase.
+
+## Auto-Sync Trigger
+
+**When to auto-sync TodoWrite**:
+
+This skill detects task creation and auto-syncs progress.md to TodoWrite:
+
+1. **After /new-task completes**: When task files exist but no todos visible
+2. **On "task created" pattern**: When progress.md was just written
+3. **On session start with active task**: Ensure TodoWrite matches progress.md
+
+**Sync logic**:
+```
+1. Read progress.md
+2. Parse checkbox items ([ ] = pending, [x] = completed)
+3. Map to TodoWrite format
+4. Call TodoWrite with parsed items
+```
+
+This removes TodoWrite dependency from commands - the skill handles it automatically.
 
 ## Source of Truth: progress.md
 
@@ -185,24 +208,14 @@ Plan checkpoints at 60-70% context:
 **TodoWrite**: UI display (mirror of progress.md)
 **Read/Write**: For task and state files
 
-### Subagents for Context Isolation
+### Context Isolation Tips
 
-Use subagents to keep main conversation context clean:
+For complex research or planning, consider using subagents to keep main conversation context clean:
 
-**Explorer Subagent** (for understanding code):
-```
-Task tool:
-- subagent_type: "Explore"
-- prompt: "Find files handling X and summarize the implementation"
-- model: "haiku" (optional, for speed)
-```
+- **Explore agent**: Use for codebase exploration (searching, reading multiple files)
+- **Plan agent**: Use for designing implementation approaches
 
-**Planner Subagent** (for designing approach):
-```
-Task tool:
-- subagent_type: "Plan"
-- prompt: "Design implementation plan for feature Y"
-```
+These are optional - only use when context isolation would help.
 
 ## Task Detection & Prompting
 
