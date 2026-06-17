@@ -137,12 +137,23 @@ else
     fi
 fi
 
+# Version stamp: report old → new and record it (canonical source: plugin.json)
+OLD_VER=$(cat "$TARGET_DIR/.claude/.ssm-version" 2>/dev/null || echo "unknown")
+NEW_VER=$(grep -m1 '"version"' "$SCRIPT_DIR/.claude-plugin/plugin.json" 2>/dev/null | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+echo "  • version"
+if $DRY; then
+    echo "    would stamp .claude/.ssm-version: ${OLD_VER} → ${NEW_VER:-?}"
+elif [ -n "$NEW_VER" ]; then
+    echo "$NEW_VER" > "$TARGET_DIR/.claude/.ssm-version" 2>/dev/null || true
+    echo "    SSM version: ${OLD_VER} → ${NEW_VER}"
+fi
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 if $DRY; then
     echo -e "${GREEN}✅ Dry run complete — $REFRESHED item(s) would be refreshed${NC}"
 else
-    echo -e "${GREEN}✅ Upgrade complete — $REFRESHED behavior item(s) refreshed${NC}"
+    echo -e "${GREEN}✅ Upgrade complete — $REFRESHED behavior item(s) refreshed (SSM ${NEW_VER:-?})${NC}"
 fi
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""

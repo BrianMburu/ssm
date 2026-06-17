@@ -80,6 +80,13 @@ echo "  → Setting hook permissions"
 chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.sh 2>/dev/null || true
 
+# Record installed SSM version (canonical source: plugin.json)
+SSM_VERSION=$(grep -m1 '"version"' "$SCRIPT_DIR/.claude-plugin/plugin.json" 2>/dev/null | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+if [ -n "$SSM_VERSION" ]; then
+    echo "$SSM_VERSION" > "$TARGET_DIR/.claude/.ssm-version" 2>/dev/null || true
+    echo "  → Installed SSM version: $SSM_VERSION"
+fi
+
 # Update .gitignore
 echo "  → Updating .gitignore"
 if [ -f "$TARGET_DIR/.gitignore" ]; then
