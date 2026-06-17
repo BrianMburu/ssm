@@ -60,6 +60,7 @@ cp -r "$SCRIPT_DIR/.claude/"* "$TARGET_DIR/.claude/"
 echo "  → Creating multi-instance directories"
 mkdir -p "$TARGET_DIR/.claude/state/sessions"
 mkdir -p "$TARGET_DIR/.claude/state/completed"
+mkdir -p "$TARGET_DIR/.claude/state/locks"   # session heartbeats + per-task locks (runtime only)
 
 # Copy tasks directory
 echo "  → Copying tasks/"
@@ -87,12 +88,14 @@ if [ -f "$TARGET_DIR/.gitignore" ]; then
         echo "# SSM cache and session-specific files" >> "$TARGET_DIR/.gitignore"
         echo ".claude/cache/" >> "$TARGET_DIR/.gitignore"
         echo ".claude/state/sessions/*.md" >> "$TARGET_DIR/.gitignore"
+        echo ".claude/state/locks/" >> "$TARGET_DIR/.gitignore"
     fi
 else
     cat > "$TARGET_DIR/.gitignore" << 'GITIGNORE'
 # SSM cache and session-specific files
 .claude/cache/
 .claude/state/sessions/*.md
+.claude/state/locks/
 GITIGNORE
 fi
 

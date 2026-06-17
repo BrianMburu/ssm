@@ -95,7 +95,7 @@ cp .claude/state/sessions/session-*.md "$ARCHIVE_DIR/sessions/" 2>/dev/null || t
 
 **First, get the actual session ID:**
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 echo "Session ID: $SESSION_ID"  # Should show a number like 828334
 ```
 
@@ -119,7 +119,7 @@ The status line reads from this file, so it will show stale data if not updated.
 
 1. Determine the session state file:
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ```
 

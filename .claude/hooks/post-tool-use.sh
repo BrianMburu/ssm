@@ -27,8 +27,22 @@ INPUT=$(cat)
 
 # Get environment
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+
+# --- SSM v3 session identity (see session-start.sh for rationale) ----------
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null || echo "")
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="default"
+# --------------------------------------------------------------------------
+
 TIMESTAMP=$(date -Iseconds 2>/dev/null || date +%Y-%m-%dT%H:%M:%S)
+
+# --- SSM v3 heartbeat: refresh liveness on tool activity (covers long,
+# single-prompt work where UserPromptSubmit doesn't fire). Cheap touch.
+SSM_LOCKS_DIR="$PROJECT_DIR/.claude/state/locks"
+mkdir -p "$SSM_LOCKS_DIR" 2>/dev/null || true
+date -Iseconds > "$SSM_LOCKS_DIR/$SESSION_ID.heartbeat" 2>/dev/null || true
 
 # State files
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"

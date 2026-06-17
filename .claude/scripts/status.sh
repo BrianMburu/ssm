@@ -10,7 +10,15 @@
 # DO NOT use set -e - status script must always output something
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+
+# Status line receives JSON on stdin. Read it so we resolve the SAME session
+# id the hooks use (env first, then stdin session_id, then "default").
+INPUT=$(cat 2>/dev/null || echo "")
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null || echo "")
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="default"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 SESSION_STATE="$PROJECT_DIR/.claude/state/sessions/session-$SESSION_ID.md"
 CONTEXT_FILE="/tmp/claude-context-pct-$SESSION_ID.txt"

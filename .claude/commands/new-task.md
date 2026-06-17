@@ -33,7 +33,7 @@ If only ID provided (no goal), ask user for goal before proceeding.
 Check if this session already has an active task:
 
 1. Read `.claude/state/active-tasks.md`
-2. Find tasks owned by this session (`$CLAUDE_SESSION_ID` or `$PPID`)
+2. Find tasks owned by this session (`${CLAUDE_SESSION_ID:-default}`)
 3. If found, mark ONLY those as PAUSED (preserve other sessions' tasks)
 4. Update the registry
 
@@ -54,23 +54,33 @@ cp tasks/.templates/decisions.md "tasks/$TASK_ID/decisions.md"
 Get values:
 ```bash
 TIMESTAMP=$(date -Iseconds)
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 DATE=$(date +%Y-%m-%d)
 ```
 
 Use Edit tool to replace placeholders in each copied file:
 - `{{TASK_ID}}` → actual task ID
 - `{{TIMESTAMP}}` → ISO timestamp
-- `{{SESSION_ID}}` → session ID (numeric)
+- `{{SESSION_ID}}` → session ID (verbatim value)
 - `{{DATE}}` → date
 - `{{GOAL}}` → user's goal
 - `{{GOAL_DESCRIPTION}}` → expanded goal (can match `{{GOAL}}` initially)
+
+## Step 4b: Seed the Design Contract (critical for multi-session work)
+
+Fill in the **## Design Contract** section of `tasks/<task-id>/plan.md` from the
+approach already discussed (or from the Plan/ssm-planner agent's output if one
+ran). At minimum capture the intended Approach and any known Invariants and
+Anti-goals. This is the binding "HOW" re-injected on every resume — a few solid
+lines now prevent the implementation from drifting across sessions later. Keep
+it tight (≤ ~25 lines). If the approach is still genuinely unknown, note that
+explicitly and fill it in at the end of Phase 1 (Research).
 
 ## Step 5: Register Task
 
 **Get session ID** (must be numeric):
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 ```
 
 Add to `.claude/state/active-tasks.md` under "Currently Active":
@@ -83,7 +93,7 @@ Add to `.claude/state/active-tasks.md` under "Currently Active":
 ## Step 6: Update Session State
 
 ```bash
-SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-default}.md"
 ```
 
 Update `$SESSION_STATE`:
@@ -104,7 +114,7 @@ Goal: <GOAL>
 Structure:
   tasks/<task-id>/
   ├── task.md      ← Metadata and status
-  ├── plan.md      ← Implementation phases
+  ├── plan.md      ← Design Contract + implementation phases
   ├── progress.md  ← Progress tracking (source of truth)
   ├── context.md   ← Files to load
   └── decisions.md ← Key decisions

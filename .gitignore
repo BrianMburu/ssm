@@ -7,6 +7,9 @@
 /tmp/ssm-*
 /tmp/claude-context-*
 
+# Session heartbeats + per-task locks (runtime only, never commit)
+.claude/state/locks/
+
 # OS files
 .DS_Store
 Thumbs.db

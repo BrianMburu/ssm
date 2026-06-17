@@ -76,6 +76,26 @@ cp -r ssm/tasks /path/to/project/
 cp ssm/CLAUDE.md /path/to/project/
 ```
 
+## Upgrading an Existing Project
+
+**Do not re-run `setup.sh` to upgrade.** `setup.sh` is for *fresh* installs —
+it does `cp -r .claude/*`, which overwrites your live `state/active-tasks.md`
+and `state/active.md` and copies example tasks in. Don't uninstall either —
+`uninstall.sh` deletes `.claude/state/` and `tasks/` unless you pass
+`--keep-data`.
+
+Use `upgrade.sh`, which refreshes **only behavior files** (hooks, commands,
+skills, agents, rules, scripts, hook registration, task templates) and never
+touches your `state/`, your task data, `CLAUDE.md`, or your `settings.json`:
+
+```bash
+./ssm/upgrade.sh /path/to/your/project --dry-run   # preview
+./ssm/upgrade.sh /path/to/your/project             # apply
+./ssm/upgrade.sh /path/to/your/project --with-settings  # also refresh settings.json (backs up first)
+```
+
+Restart Claude Code in the project afterward so the refreshed hooks load.
+
 ## Quick Start
 
 ### Start Working

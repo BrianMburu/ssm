@@ -32,9 +32,14 @@ Progress preserved in `progress.md`. No context loss.
 ## State Management
 
 1. **progress.md is source of truth** - Not TodoWrite
-2. **plan.md guides work** - Check phases and checkpoints
+2. **plan.md guides work** - Its **Design Contract is binding**; check phases/checkpoints
 3. **context.md lists files** - Load only what's needed
 4. **active.md tracks session** - Current focus and next steps
+
+**Design Contract**: `plan.md` opens with a Design Contract (the durable "HOW":
+approach, conventions, invariants, key decisions, anti-goals). It is re-injected
+on every resume and re-affirmed on every `/save-state`. Implement to it; if you
+must deviate, update the contract in the same session so it never goes stale.
 
 ## Session Workflow
 

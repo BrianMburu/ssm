@@ -17,7 +17,7 @@ Use this when:
 
 ```bash
 # Get current session's task
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 SESSION_FILE=".claude/state/sessions/session-$SESSION_ID.md"
 
 if [ -f "$SESSION_FILE" ]; then
@@ -93,7 +93,7 @@ Update `.claude/state/active-tasks.md` to release the task.
 
 **First, get the actual session ID:**
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 echo "Session ID: $SESSION_ID"  # Should show a number like 734239
 ```
 
@@ -116,8 +116,15 @@ Note: "734239" is the actual numeric session ID that released the task.
 
 Determine session state file:
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
+
+# Release the task lock so another session can claim it cleanly.
+# Only remove it if WE own it (don't clobber another session's lock).
+LOCK=".claude/state/locks/$TASK_ID.lock"
+if [ -f "$LOCK" ] && [ "$(head -1 "$LOCK" 2>/dev/null | xargs)" = "$SESSION_ID" ]; then
+  rm -f "$LOCK"
+fi
 ```
 
 Update `$SESSION_STATE`:

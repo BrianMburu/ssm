@@ -40,7 +40,21 @@ SOURCE=$(echo "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' | cu
 
 # Get project directory and session ID
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+
+# --- SSM v3 session identity --------------------------------------------
+# Prefer the stable session id. The env var and the hook JSON `session_id`
+# are the same value for the life of the session, so commands (which see the
+# env var) and hooks (which see the JSON) stay aligned. Fall back to the JSON
+# payload, then to "default".
+# The old $PPID fallback was REMOVED: PPID collides across terminals, which
+# made two sessions share one state file and silently corrupt task state.
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null || echo "")
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="default"
+# ------------------------------------------------------------------------
+
 SESSION_DIR="$PROJECT_DIR/.claude/state/sessions"
 SESSION_STATE="$SESSION_DIR/session-$SESSION_ID.md"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
@@ -48,6 +62,16 @@ ACTIVE_TASKS="$PROJECT_DIR/.claude/state/active-tasks.md"
 
 # Ensure session directory exists
 mkdir -p "$SESSION_DIR" 2>/dev/null || true
+
+# --- SSM v3 heartbeat: record this session's liveness for conflict detection.
+# Other sessions read these to tell a live session from a crashed one.
+LOCKS_DIR="$PROJECT_DIR/.claude/state/locks"
+mkdir -p "$LOCKS_DIR" 2>/dev/null || true
+date -Iseconds > "$LOCKS_DIR/$SESSION_ID.heartbeat" 2>/dev/null || true
+
+# Reset the Phase-C nudge debounce so a fresh session re-flags any wrong-task
+# or conflict situation (rather than staying silent after a prior warning).
+rm -f "/tmp/ssm-warned-$SESSION_ID.txt" 2>/dev/null || true
 
 # Determine which state file to use
 STATE_FILE=""
@@ -124,6 +148,17 @@ NOTE: Sync progress.md to TodoWrite with /task-status"
     fi
 fi
 
+# Extract the Design Contract from plan.md (the durable "HOW"). This is the
+# Phase-B fix for strategy loss across sessions: re-inject the binding design
+# on every resume so the agent doesn't drift off-architecture. Bounded to keep
+# it small — it is meant to be ≤ ~25 lines by construction.
+DESIGN_CONTRACT=""
+if [ "$CURRENT_TASK" != "none" ] && [ -f "$PROJECT_DIR/tasks/$CURRENT_TASK/plan.md" ]; then
+    DESIGN_CONTRACT=$(awk '/^## Design Contract/{f=1;next} /^## /{f=0} f' \
+        "$PROJECT_DIR/tasks/$CURRENT_TASK/plan.md" 2>/dev/null \
+        | grep -v '^<!--' | grep -v '^-->' | grep -v '^[[:space:]]*$' | head -30 || echo "")
+fi
+
 # Check for other active tasks across sessions
 OTHER_TASKS=""
 if [ -f "$ACTIVE_TASKS" ]; then
@@ -154,6 +189,17 @@ $CONTEXT_FILES
 
 Next Steps:
 $NEXT_STEPS"
+
+# Inject the Design Contract (binding implementation strategy) if present
+if [ -n "$DESIGN_CONTRACT" ]; then
+    CONTEXT="$CONTEXT
+
+━━━ DESIGN CONTRACT (binding — implement to THIS) ━━━
+$DESIGN_CONTRACT
+
+⚠️ Honor the Design Contract above. Before writing code, read
+   tasks/$CURRENT_TASK/plan.md and tasks/$CURRENT_TASK/decisions.md in full."
+fi
 
 # Add blocker warning if present
 if [ -n "$BLOCKERS" ]; then

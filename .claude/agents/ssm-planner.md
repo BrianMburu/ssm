@@ -64,8 +64,14 @@ Request plans in this format for consistency:
 ## Goal
 <One sentence describing what we're achieving>
 
-## Approach
-<Brief description of chosen strategy>
+## Design Contract
+<The durable "HOW" — this becomes plan.md's Design Contract, re-injected every
+session. Keep it ≤ ~25 lines.>
+- Approach: <chosen architecture/strategy and why>
+- Conventions & patterns: <naming, layering, libs, error handling>
+- Invariants (must NOT break): <data shapes, APIs, ordering>
+- Key decisions: <DEC-001: chose X over Y because Z>
+- Anti-goals: <what NOT to build>
 
 ## Steps
 1. [ ] Step one (files: x.ts, y.ts)
@@ -93,9 +99,11 @@ Request plans in this format for consistency:
 After planning:
 1. If plan is approved, create task with `/new-task`
 2. Task creates full structure including `plan.md` with checkpoints
-3. Steps go into `progress.md` (source of truth)
-4. Sync `progress.md` to TodoWrite for UI visibility
-5. Update `active.md` with first step as Current Focus
+3. Write the **Design Contract** into `plan.md` — it is re-injected on every
+   resume and is the main defense against cross-session strategy drift
+4. Steps go into `progress.md` (source of truth)
+5. Sync `progress.md` to TodoWrite for UI visibility
+6. Update `active.md` with first step as Current Focus
 
 **Important**:
 - `progress.md` is the source of truth, not TodoWrite

@@ -7,9 +7,17 @@ Updated by: <!-- Session ID that last modified -->
 
 ## Currently Active
 
-| Task ID | Session | Started | Phase | Status |
-|---------|---------|---------|-------|--------|
-| session-id-bug | 828334 | 2026-01-14 | Complete | COMPLETED |
+| Task ID | Session | Started | Phase | Status | LastSeen |
+|---------|---------|---------|-------|--------|----------|
+| <!-- task | session-id | YYYY-MM-DD | Phase N | IN_PROGRESS | ISO-8601 --> |
+
+<!--
+LastSeen is the owning session's last heartbeat (ISO-8601). A session is
+considered LIVE if LastSeen is < 30 min ago. The heartbeat is refreshed
+automatically by SSM hooks (UserPromptSubmit / PostToolUse / SessionStart);
+the authoritative source is .claude/state/locks/<session-id>.heartbeat.
+Use it to tell a live session from a crashed one before claiming/overwriting.
+-->
 
 ## Paused Tasks
 

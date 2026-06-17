@@ -26,7 +26,15 @@ INPUT=$(cat)
 
 # Get project directory and session info
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+
+# --- SSM v3 session identity (see session-start.sh for rationale) ----------
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null || echo "")
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="default"
+# --------------------------------------------------------------------------
+
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"
 
 # Default: allow stop
