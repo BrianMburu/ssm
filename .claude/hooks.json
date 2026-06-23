@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/session-start.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/session-start.sh"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/track-changes.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/track-changes.sh"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/post-tool-use.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/post-tool-use.sh"
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/pre-compact.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/pre-compact.sh"
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/context-check.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/context-check.sh"
           }
         ]
       }
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/stop-hook.sh"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/.claude/hooks/stop-hook.sh"
           }
         ]
       }

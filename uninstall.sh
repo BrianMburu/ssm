@@ -118,6 +118,7 @@ SSM_TEMPLATES=(
     "progress.md"
     "context.md"
     "decisions.md"
+    "task-template.md"
 )
 
 # SSM skills (directories)
@@ -147,6 +148,7 @@ SSM_SCRIPTS=(
     "status.sh"
     "context-size.sh"
     "post-install.sh"
+    "bootstrap.sh"
 )
 
 # Count what will be removed
@@ -406,6 +408,7 @@ fi
 # Remove config files
 echo "  → Removing SSM config files..."
 rm -f "$TARGET_DIR/.claude/hooks.json"
+rm -f "$TARGET_DIR/.claude/.ssm-version"
 rm -rf "$TARGET_DIR/.claude-plugin"
 
 # Handle state
@@ -436,6 +439,7 @@ if [ -f "$TARGET_DIR/.gitignore" ]; then
     sed -i '/# SSM cache and session-specific files/d' "$TARGET_DIR/.gitignore" 2>/dev/null || true
     sed -i '/\.claude\/cache\//d' "$TARGET_DIR/.gitignore" 2>/dev/null || true
     sed -i '/\.claude\/state\/sessions\/\*\.md/d' "$TARGET_DIR/.gitignore" 2>/dev/null || true
+    sed -i '/\.claude\/state\/locks\//d' "$TARGET_DIR/.gitignore" 2>/dev/null || true
 fi
 
 # Update settings.json to remove SSM hooks (if file still exists and has other content)

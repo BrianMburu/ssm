@@ -40,6 +40,11 @@ upgrade path. Backward compatible — default (solo) behavior is unchanged.
   to update SSM in an in-use project. Supports `--dry-run` and `--with-settings`.
 - **Per-project version stamp** — `setup.sh` and `upgrade.sh` write
   `.claude/.ssm-version` so a project records which SSM version it runs.
+- **Working plugin install** — the plugin manifest now passes
+  `claude plugin validate`; `hooks.json` uses `${CLAUDE_PLUGIN_ROOT}` so
+  plugin-installed hooks resolve correctly; a new `scripts/bootstrap.sh`
+  (invoked on first SessionStart of a plugin install) materializes the
+  project-side scaffolding plugins can't ship (state, task templates, rules).
 
 ### Changed
 - **Session identity** — hooks and commands resolve a stable session id as
@@ -52,6 +57,15 @@ upgrade path. Backward compatible — default (solo) behavior is unchanged.
   made two sessions share one state file and silently corrupt task state.
 - **Wrong-task progress writes** — the reconciliation guard + proactive nudges
   prevent saving progress to the wrong task.
+- **Invalid plugin manifest** — `commands`/`skills`/`agents`/`hooks` paths now
+  start with `./`; removed unsupported `rules`/`scripts`/`files` fields.
+- **`setup.sh` skipped task templates** — copied with `tasks/*` (a glob that
+  silently skips the dotfile `.templates/` dir); now uses `tasks/.`.
+- **Shipped example/dev artifacts** — removed the bundled `tasks/session-id-bug`,
+  `tasks/unknown`, stale `session-*.md`, and legacy `task-template.md` that
+  `setup.sh` was leaking into installs.
+- **`uninstall.sh` left residue** — now removes `.ssm-version`, the
+  `state/locks/` gitignore line, and `bootstrap.sh`.
 
 ## [1.0.0] - prior baseline
 

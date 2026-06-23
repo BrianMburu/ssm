@@ -3,11 +3,11 @@
   "version": "1.1.0",
   "description": "Session State Manager - Bulletproof context preservation and task management for Claude Code",
   "author": {
-    "name": "Brian",
-    "url": "https://github.com/brian"
+    "name": "Brian Mburu",
+    "url": "https://github.com/BrianMburu"
   },
-  "homepage": "https://github.com/brian/ssm",
-  "repository": "https://github.com/brian/ssm",
+  "homepage": "https://github.com/BrianMburu/ssm",
+  "repository": "https://github.com/BrianMburu/ssm",
   "license": "MIT",
   "keywords": [
     "context-management",
@@ -16,30 +16,11 @@
     "compaction-prevention",
     "multi-instance"
   ],
-  "commands": [".claude/commands/"],
-  "skills": [".claude/skills/"],
-  "agents": [".claude/agents/"],
-  "hooks": ".claude/hooks.json",
-  "rules": [
-    {
-      "path": ".claude/rules/ssm/core.md",
-      "globs": ["**/*"]
-    },
-    {
-      "path": ".claude/rules/ssm/tasks.md",
-      "globs": ["tasks/**/*"]
-    },
-    {
-      "path": ".claude/rules/ssm/state.md",
-      "globs": [".claude/state/**/*"]
-    }
+  "commands": ["./.claude/commands/"],
+  "skills": "./.claude/skills/",
+  "agents": [
+    "./.claude/agents/ssm-explorer.md",
+    "./.claude/agents/ssm-planner.md"
   ],
-  "scripts": {
-    "postinstall": ".claude/scripts/post-install.sh"
-  },
-  "files": [
-    ".claude/",
-    "tasks/",
-    "CLAUDE.md"
-  ]
+  "hooks": "./.claude/hooks.json"
 }

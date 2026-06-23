@@ -55,6 +55,14 @@ fi
 [ -z "$SESSION_ID" ] && SESSION_ID="default"
 # ------------------------------------------------------------------------
 
+# Plugin install bootstrap: a plugin ships commands/skills/agents/hooks but not
+# the project-side scaffolding (state/, tasks/.templates/, rules/). On first run
+# of a plugin install, materialize it. Runs ONLY as a plugin (CLAUDE_PLUGIN_ROOT
+# set) and only when state is absent — manual/setup.sh installs are untouched.
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ ! -d "$PROJECT_DIR/.claude/state" ]; then
+    bash "$CLAUDE_PLUGIN_ROOT/.claude/scripts/bootstrap.sh" "$PROJECT_DIR" "$CLAUDE_PLUGIN_ROOT" 2>/dev/null || true
+fi
+
 SESSION_DIR="$PROJECT_DIR/.claude/state/sessions"
 SESSION_STATE="$SESSION_DIR/session-$SESSION_ID.md"
 ACTIVE_STATE="$PROJECT_DIR/.claude/state/active.md"

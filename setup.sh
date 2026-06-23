@@ -51,10 +51,10 @@ mkdir -p "$TARGET_DIR"
 
 echo "Installing SSM components..."
 
-# Copy .claude directory
+# Copy .claude directory ('/.' copies dotfiles too, e.g. state/sessions/.session-template.md)
 echo "  → Copying .claude/"
 mkdir -p "$TARGET_DIR/.claude"
-cp -r "$SCRIPT_DIR/.claude/"* "$TARGET_DIR/.claude/"
+cp -r "$SCRIPT_DIR/.claude/." "$TARGET_DIR/.claude/"
 
 # Ensure multi-instance directories exist
 echo "  → Creating multi-instance directories"
@@ -62,10 +62,11 @@ mkdir -p "$TARGET_DIR/.claude/state/sessions"
 mkdir -p "$TARGET_DIR/.claude/state/completed"
 mkdir -p "$TARGET_DIR/.claude/state/locks"   # session heartbeats + per-task locks (runtime only)
 
-# Copy tasks directory
+# Copy tasks directory ('/.' is REQUIRED: tasks/ only contains the dotfile
+# .templates/ dir, which a 'tasks/*' glob would silently skip)
 echo "  → Copying tasks/"
 mkdir -p "$TARGET_DIR/tasks"
-cp -r "$SCRIPT_DIR/tasks/"* "$TARGET_DIR/tasks/" 2>/dev/null || true
+cp -r "$SCRIPT_DIR/tasks/." "$TARGET_DIR/tasks/" 2>/dev/null || true
 
 # Copy CLAUDE.md if it doesn't exist
 if [ ! -f "$TARGET_DIR/CLAUDE.md" ]; then
@@ -189,7 +190,7 @@ else
 fi
 
 # Commands
-COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task" "task-status" "task-history" "ssm-status")
+COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task" "task-status" "task-history" "ssm-status" "start")
 MISSING_COMMANDS=0
 for cmd in "${COMMANDS[@]}"; do
     if [ ! -f "$TARGET_DIR/.claude/commands/$cmd.md" ]; then
