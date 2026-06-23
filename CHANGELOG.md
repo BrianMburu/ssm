@@ -45,6 +45,9 @@ upgrade path. Backward compatible — default (solo) behavior is unchanged.
   plugin-installed hooks resolve correctly; a new `scripts/bootstrap.sh`
   (invoked on first SessionStart of a plugin install) materializes the
   project-side scaffolding plugins can't ship (state, task templates, rules).
+  A `.claude-plugin/marketplace.json` makes the plugin installable via
+  `/plugin marketplace add BrianMburu/ssm` + `/plugin install ssm@ssm`; README
+  install instructions corrected to the real marketplace flow.
 
 ### Changed
 - **Session identity** — hooks and commands resolve a stable session id as

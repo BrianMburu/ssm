@@ -53,18 +53,25 @@ Progress preserved in `progress.md`. No information loss.
 
 ### Option 1: Plugin Install (Recommended)
 
+SSM is distributed as a Claude Code plugin. Add this repository as a plugin
+marketplace, then install the plugin from it:
+
 ```bash
 # In Claude Code
-/plugin install ssm
+/plugin marketplace add BrianMburu/ssm
+/plugin install ssm@ssm
 ```
 
-That's it! SSM auto-initializes on first session.
+On the **first session** after install, SSM auto-initializes the project
+scaffolding it needs — `.claude/state/`, `tasks/.templates/`, and rules — so
+there's no manual `setup.sh` step. Pull future updates with
+`/plugin marketplace update ssm`.
 
 ### Option 2: Manual Setup
 
 ```bash
 # Clone and run setup script
-git clone https://github.com/brian/ssm
+git clone https://github.com/BrianMburu/ssm
 ./ssm/setup.sh /path/to/your/project
 ```
 
