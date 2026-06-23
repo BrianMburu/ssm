@@ -51,20 +51,22 @@ mkdir -p "$TARGET_DIR"
 
 echo "Installing SSM components..."
 
-# Copy .claude directory
+# Copy .claude directory ('/.' copies dotfiles too, e.g. state/sessions/.session-template.md)
 echo "  → Copying .claude/"
 mkdir -p "$TARGET_DIR/.claude"
-cp -r "$SCRIPT_DIR/.claude/"* "$TARGET_DIR/.claude/"
+cp -r "$SCRIPT_DIR/.claude/." "$TARGET_DIR/.claude/"
 
 # Ensure multi-instance directories exist
 echo "  → Creating multi-instance directories"
 mkdir -p "$TARGET_DIR/.claude/state/sessions"
 mkdir -p "$TARGET_DIR/.claude/state/completed"
+mkdir -p "$TARGET_DIR/.claude/state/locks"   # session heartbeats + per-task locks (runtime only)
 
-# Copy tasks directory
+# Copy tasks directory ('/.' is REQUIRED: tasks/ only contains the dotfile
+# .templates/ dir, which a 'tasks/*' glob would silently skip)
 echo "  → Copying tasks/"
 mkdir -p "$TARGET_DIR/tasks"
-cp -r "$SCRIPT_DIR/tasks/"* "$TARGET_DIR/tasks/" 2>/dev/null || true
+cp -r "$SCRIPT_DIR/tasks/." "$TARGET_DIR/tasks/" 2>/dev/null || true
 
 # Copy CLAUDE.md if it doesn't exist
 if [ ! -f "$TARGET_DIR/CLAUDE.md" ]; then
@@ -79,6 +81,13 @@ echo "  → Setting hook permissions"
 chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.sh 2>/dev/null || true
 
+# Record installed SSM version (canonical source: plugin.json)
+SSM_VERSION=$(grep -m1 '"version"' "$SCRIPT_DIR/.claude-plugin/plugin.json" 2>/dev/null | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+if [ -n "$SSM_VERSION" ]; then
+    echo "$SSM_VERSION" > "$TARGET_DIR/.claude/.ssm-version" 2>/dev/null || true
+    echo "  → Installed SSM version: $SSM_VERSION"
+fi
+
 # Update .gitignore
 echo "  → Updating .gitignore"
 if [ -f "$TARGET_DIR/.gitignore" ]; then
@@ -87,12 +96,14 @@ if [ -f "$TARGET_DIR/.gitignore" ]; then
         echo "# SSM cache and session-specific files" >> "$TARGET_DIR/.gitignore"
         echo ".claude/cache/" >> "$TARGET_DIR/.gitignore"
         echo ".claude/state/sessions/*.md" >> "$TARGET_DIR/.gitignore"
+        echo ".claude/state/locks/" >> "$TARGET_DIR/.gitignore"
     fi
 else
     cat > "$TARGET_DIR/.gitignore" << 'GITIGNORE'
 # SSM cache and session-specific files
 .claude/cache/
 .claude/state/sessions/*.md
+.claude/state/locks/
 GITIGNORE
 fi
 
@@ -179,7 +190,7 @@ else
 fi
 
 # Commands
-COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task" "task-status" "task-history" "ssm-status")
+COMMANDS=("save-state" "continue-task" "new-task" "complete-task" "active-tasks" "claim-task" "release-task" "task-status" "task-history" "ssm-status" "start")
 MISSING_COMMANDS=0
 for cmd in "${COMMANDS[@]}"; do
     if [ ! -f "$TARGET_DIR/.claude/commands/$cmd.md" ]; then

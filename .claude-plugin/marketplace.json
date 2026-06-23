@@ -1,0 +1,17 @@
+{
+  "name": "ssm",
+  "owner": {
+    "name": "Brian Mburu",
+    "url": "https://github.com/BrianMburu"
+  },
+  "metadata": {
+    "description": "Session State Manager for Claude Code — context preservation, the Design Contract, and multi-session task management."
+  },
+  "plugins": [
+    {
+      "name": "ssm",
+      "source": "./",
+      "description": "Session State Manager — bulletproof context preservation and multi-session task management for Claude Code"
+    }
+  ]
+}

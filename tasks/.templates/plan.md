@@ -7,6 +7,24 @@ Goal: {{GOAL}}
 
 {{GOAL_DESCRIPTION}}
 
+## Design Contract
+
+<!--
+THE most important section for multi-session consistency. This is the durable
+"HOW" — re-injected into context on every resume and re-affirmed on every
+/save-state. Keep it TIGHT (≤ ~25 lines / ~400 tokens): it is reloaded every
+session, so it must stay small and current, not become a second plan.
+Fill it during planning; update it (don't rewrite progress here) as the design
+evolves. Phase checkboxes and progress live elsewhere — this is the contract
+the implementation must honor.
+-->
+
+- **Approach**: <2–4 sentences: the chosen architecture/strategy and why>
+- **Conventions & patterns**: <naming, layering, error handling, libs to use>
+- **Invariants** (must NOT be violated): <data shapes, APIs, ordering, etc.>
+- **Key decisions**: <one-liners; mirror DEC-ids from decisions.md — e.g. `DEC-001: chose X over Y because Z`>
+- **Anti-goals** (explicitly out): <what NOT to build / patterns to avoid>
+
 ## Context Budget
 
 **Important**: Large tasks span multiple sessions. Plan checkpoints accordingly.

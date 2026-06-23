@@ -7,10 +7,13 @@ Rules that apply when working with .claude/state/ files.
 ```
 .claude/state/
 ├── active.md           # Single-instance fallback
-├── active-tasks.md     # Task registry (all sessions)
+├── active-tasks.md     # Task registry (all sessions) — has a LastSeen column
 ├── context-registry.md # File token estimates
 ├── sessions/           # Per-session state
 │   └── session-<id>.md
+├── locks/              # Runtime only (git-ignored)
+│   ├── <session-id>.heartbeat  # last-active ISO ts; LIVE if < 30 min
+│   └── <task-id>.lock          # owning session id
 └── completed/          # Archived tasks
 ```
 
@@ -45,6 +48,14 @@ Each Claude instance gets `session-<id>.md` containing:
 ## Multi-Instance Coordination
 
 - Only one session owns a task at a time
-- Ownership tracked in active-tasks.md
+- Ownership tracked in active-tasks.md + a lock in `locks/<task>.lock`
+- Liveness tracked via `locks/<session>.heartbeat` (LIVE if < 30 min old)
 - Use `/release-task` before switching sessions
-- Use `/claim-task` to take over paused work
+- Use `/claim-task` to take over paused or stale work
+
+## Wrong-Task Guard (v3)
+
+Before `/save-state` writes to any `progress.md`, it reconciles the session's
+"Current Task" against the task actually edited this session (inferred from
+`tasks/<id>/` paths by the track-changes hook). On mismatch it **stops and
+asks** rather than silently writing to the wrong task. Never bypass this guard.

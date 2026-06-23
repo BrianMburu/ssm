@@ -32,7 +32,7 @@ Maintains task continuity across sessions by managing state files.
 **Fallback**: `.claude/state/active.md` (only if session ID unavailable)
 
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 echo "Session ID: $SESSION_ID"  # Should show a number like 828334
 ```
@@ -73,7 +73,7 @@ Also update the todo list to reflect current progress.
 
 1. Determine session state file:
    ```bash
-   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-default}.md"
    ```
 2. Read `$SESSION_STATE` (fall back to `active.md` if not found)
 3. Show: Task, Phase, Current Focus

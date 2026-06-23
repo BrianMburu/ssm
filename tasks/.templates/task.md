@@ -11,7 +11,7 @@ Owner: {{SESSION_ID}}
 
 ## Quick Links
 
-- [Plan](./plan.md) - Implementation phases and checkpoints
+- [Plan](./plan.md) - Design Contract (binding) + implementation phases
 - [Progress](./progress.md) - Detailed progress tracking (source of truth)
 - [Context](./context.md) - Files to load, token estimates
 - [Decisions](./decisions.md) - Key decisions made

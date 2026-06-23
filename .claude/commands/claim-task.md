@@ -27,21 +27,38 @@ grep "$ARGUMENTS" .claude/state/active-tasks.md
 
 If task doesn't exist, show error and suggest `/active-tasks` to see available tasks.
 
-## Step 2: Check Task Status
+## Step 2: Check Task Status & Liveness
 
-Read the registry to determine task status:
+Read the registry to determine task status, then use the owning session's
+**heartbeat** to decide whether it is genuinely live (not just "IN_PROGRESS"
+in a stale registry row):
 
 | Status | Can Claim? | Action |
 |--------|------------|--------|
 | PAUSED | ✅ Yes | Direct claim |
-| STALE (>24h inactive) | ✅ Yes | Claim with warning |
-| ACTIVE | ⚠️ Confirm | Requires confirmation (may disrupt other session) |
+| IN_PROGRESS, owner heartbeat ≥ 30m (STALE) | ✅ Yes | Claim with warning |
+| IN_PROGRESS, owner heartbeat < 30m (LIVE) | ⚠️ Confirm | May disrupt an active session |
 | Owned by current session | ❌ No | Already yours |
 
 ```bash
-# Get current owner
+# Get current owner from the registry
 OWNER=$(grep "$ARGUMENTS" .claude/state/active-tasks.md | awk -F'|' '{print $3}' | xargs)
+
+# Determine liveness from the owner's heartbeat (authoritative source)
+HB=".claude/state/locks/$OWNER.heartbeat"
+LIVE="no"
+if [ -f "$HB" ]; then
+  LAST=$(date -d "$(cat "$HB")" +%s 2>/dev/null || echo 0)
+  AGE_MIN=$(( ( $(date +%s) - LAST ) / 60 ))
+  [ "$AGE_MIN" -lt 30 ] && LIVE="yes"
+  echo "Owner '$OWNER' heartbeat ${AGE_MIN}m ago (live: $LIVE)"
+else
+  echo "No heartbeat for owner '$OWNER' — treat as stale/safe to claim"
+fi
 ```
+
+If `LIVE=yes`, this is genuinely an active session — go to Step 3 (confirm).
+If `LIVE=no`, the previous session is stale/crashed — claim is safe.
 
 ## Step 3: Handle Active Task Warning
 
@@ -111,33 +128,38 @@ Save to: `tasks/<task-id>/handoffs/handoff-<timestamp>.md`
 
 Update `.claude/state/active-tasks.md` to transfer ownership.
 
-**First, get the actual session ID:**
+**First, get the actual session ID and take the lock:**
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
-echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+mkdir -p .claude/state/locks
+# Take ownership of the task lock and start our own heartbeat
+printf '%s\n%s\n' "$SESSION_ID" "$(date -Iseconds)" > ".claude/state/locks/$ARGUMENTS.lock"
+date -Iseconds > ".claude/state/locks/$SESSION_ID.heartbeat"
+echo "Session ID: $SESSION_ID (lock taken on $ARGUMENTS)"
 ```
 
 **Then update the registry row for the claimed task:**
 1. Find the row for `$ARGUMENTS` (the task being claimed)
-2. Change Session column to the NUMERIC `$SESSION_ID` value (e.g., "828334")
+2. Change Session column to the actual `$SESSION_ID` value
 3. Update Status to "IN_PROGRESS"
+4. Update the LastSeen column to the current ISO timestamp
 
-**⚠️ CRITICAL**: When updating the Session column, write the actual NUMERIC
-session ID (e.g., "828334"), NOT literal words like "current", "new", or
-"this session". Literal strings cause multi-session collisions.
+**⚠️ CRITICAL**: When updating the Session column, write the actual
+`$SESSION_ID` value, NOT literal words like "current", "new", or "this
+session". Literal strings cause multi-session collisions.
 
 **Example Edit:**
 ```
-Old: | my-task | 734239 | 2026-01-14 | Phase 2 | PAUSED |
-New: | my-task | 828334 | 2026-01-14 | Phase 2 | IN_PROGRESS |
+Old: | my-task | sess-old111 | 2026-01-14 | Phase 2 | PAUSED      | 2026-01-14T09:00:00Z |
+New: | my-task | sess-new222 | 2026-01-14 | Phase 2 | IN_PROGRESS | 2026-06-16T14:30:00Z |
 ```
-Note: 828334 is the NEW session's numeric ID, replacing the old session's ID.
+Note: `sess-new222` is the NEW session's ID, replacing the old session's ID.
 
 ## Step 7: Update Session States (CRITICAL)
 
 Determine session state files:
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 CURRENT_SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ```
 

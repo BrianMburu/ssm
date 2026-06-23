@@ -67,7 +67,7 @@ Create ALL files using templates from `tasks/.templates/`:
 
 **First, get the actual session ID:**
 ```bash
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
 echo "Session ID: $SESSION_ID"  # Should show a number like 828334
 ```
 
@@ -85,7 +85,7 @@ literal words like "current", "new", or "session-id". Literals cause collisions.
 
 **IMPORTANT**: Update the SESSION-SPECIFIC state file:
 ```bash
-SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-default}.md"
 ```
 
 Update `$SESSION_STATE` with:
@@ -165,7 +165,7 @@ When user asks about status:
 
 1. Read session state for current task:
    ```bash
-   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+   SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-default}.md"
    ```
 2. **Read `tasks/<id>/progress.md`** for actual progress (source of truth)
 3. Read `tasks/<id>/plan.md` for phase details
@@ -248,7 +248,7 @@ Tracked tasks preserve progress across context clears.
 
 Determine session state file:
 ```bash
-SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-$PPID}.md"
+SESSION_STATE=".claude/state/sessions/session-${CLAUDE_SESSION_ID:-default}.md"
 ```
 
 ### After Completing a Step

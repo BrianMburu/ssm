@@ -42,18 +42,35 @@ Each session can ONLY:
 ## Session Identification
 
 ```bash
-# Get current session ID
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
-echo "Session ID: $SESSION_ID"  # Should show a number like 828334
+# Get current session ID (a stable per-session identifier from Claude Code)
+SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+echo "Session ID: $SESSION_ID"
 
 # This session's state file
 SESSION_STATE=".claude/state/sessions/session-$SESSION_ID.md"
 ```
 
-**⚠️ CRITICAL**: The session ID is a NUMERIC value (e.g., "828334", "734239").
-When writing session IDs to the registry or state files, ALWAYS use the actual
-numeric value, NEVER literal words like "current", "new", "this", or "default".
-Using literal strings causes session collisions between multiple Claude instances.
+**⚠️ CRITICAL**: Use the actual `$CLAUDE_SESSION_ID` value verbatim. NEVER
+substitute literal words like "current", "new", or "this", and NEVER fall back
+to `$PPID` — PPID collides across terminals and makes two sessions share one
+state file (the historical cause of corrupted task state). The only safe
+fallback is the literal `default` (single-instance mode).
+
+## Liveness & Locks (v3)
+
+Ownership is no longer advisory-only. Two runtime signals back it:
+
+- **Heartbeat** — `.claude/state/locks/<session-id>.heartbeat` holds the
+  session's last-active ISO timestamp, refreshed automatically by SSM hooks
+  (UserPromptSubmit / PostToolUse / SessionStart). A session is **LIVE** if its
+  heartbeat is < 30 min old, otherwise **STALE**.
+- **Task lock** — `.claude/state/locks/<task-id>.lock` names the owning session.
+  `claim-task` takes it, `release-task`/`complete-task` clear it, and
+  `save-state` checks it before writing.
+
+**Before overwriting another session's task**, check its heartbeat: if LIVE,
+warn and ask the user; if STALE/missing, takeover is safe. These files are
+runtime-only and git-ignored.
 
 ## Task Registry Structure
 
@@ -159,21 +176,24 @@ Both work independently. Neither affects the other.
 
 ## Ownership Validation
 
-Before ANY status change:
+Before ANY status change, check ownership AND liveness (status alone can be
+stale — a crashed session leaves a phantom IN_PROGRESS row):
 
 ```bash
-TASK_SESSION=$(grep "$TASK_ID" active-tasks.md | awk '{print $2}')
+TASK_SESSION=$(grep "$TASK_ID" active-tasks.md | awk -F'|' '{print $3}' | xargs)
 
-if [ "$TASK_SESSION" != "$SESSION_ID" ]; then
-    # This task is NOT ours
-    if [ "$STATUS" = "PAUSED" ]; then
-        # Can claim paused tasks
-        echo "Claiming paused task..."
+if [ -n "$TASK_SESSION" ] && [ "$TASK_SESSION" != "$SESSION_ID" ]; then
+    # Not ours — is the owner actually live?
+    HB=".claude/state/locks/$TASK_SESSION.heartbeat"
+    LIVE="no"
+    if [ -f "$HB" ]; then
+        AGE_MIN=$(( ( $(date +%s) - $(date -d "$(cat "$HB")" +%s 2>/dev/null || echo 0) ) / 60 ))
+        [ "$AGE_MIN" -lt 30 ] && LIVE="yes"
+    fi
+    if [ "$LIVE" = "yes" ]; then
+        echo "Task owned by LIVE session $TASK_SESSION — warn the user before taking over."
     else
-        # Cannot modify active task owned by another
-        echo "ERROR: Task owned by session $TASK_SESSION"
-        echo "Use /claim-task if they release it"
-        exit 1
+        echo "Owner $TASK_SESSION is stale/crashed — safe to claim."
     fi
 fi
 ```

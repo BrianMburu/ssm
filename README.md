@@ -53,18 +53,25 @@ Progress preserved in `progress.md`. No information loss.
 
 ### Option 1: Plugin Install (Recommended)
 
+SSM is distributed as a Claude Code plugin. Add this repository as a plugin
+marketplace, then install the plugin from it:
+
 ```bash
 # In Claude Code
-/plugin install ssm
+/plugin marketplace add BrianMburu/ssm
+/plugin install ssm@ssm
 ```
 
-That's it! SSM auto-initializes on first session.
+On the **first session** after install, SSM auto-initializes the project
+scaffolding it needs — `.claude/state/`, `tasks/.templates/`, and rules — so
+there's no manual `setup.sh` step. Pull future updates with
+`/plugin marketplace update ssm`.
 
 ### Option 2: Manual Setup
 
 ```bash
 # Clone and run setup script
-git clone https://github.com/brian/ssm
+git clone https://github.com/BrianMburu/ssm
 ./ssm/setup.sh /path/to/your/project
 ```
 
@@ -75,6 +82,26 @@ cp -r ssm/.claude /path/to/project/
 cp -r ssm/tasks /path/to/project/
 cp ssm/CLAUDE.md /path/to/project/
 ```
+
+## Upgrading an Existing Project
+
+**Do not re-run `setup.sh` to upgrade.** `setup.sh` is for *fresh* installs —
+it does `cp -r .claude/*`, which overwrites your live `state/active-tasks.md`
+and `state/active.md` and copies example tasks in. Don't uninstall either —
+`uninstall.sh` deletes `.claude/state/` and `tasks/` unless you pass
+`--keep-data`.
+
+Use `upgrade.sh`, which refreshes **only behavior files** (hooks, commands,
+skills, agents, rules, scripts, hook registration, task templates) and never
+touches your `state/`, your task data, `CLAUDE.md`, or your `settings.json`:
+
+```bash
+./ssm/upgrade.sh /path/to/your/project --dry-run   # preview
+./ssm/upgrade.sh /path/to/your/project             # apply
+./ssm/upgrade.sh /path/to/your/project --with-settings  # also refresh settings.json (backs up first)
+```
+
+Restart Claude Code in the project afterward so the refreshed hooks load.
 
 ## Quick Start
 

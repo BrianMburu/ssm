@@ -24,18 +24,24 @@ Key information to extract:
 
 ## Step 2: Load Task Context (If Applicable)
 
-If a task is active, load its context:
+If a task is active, load its context. **Read the Design Contract and decisions
+BEFORE writing any code** — they are the binding implementation strategy and are
+the difference between resuming on-design and drifting:
 
 ```bash
-# Task plan
-cat tasks/<task-id>/plan.md
+# Implementation strategy (binding) + full plan
+cat tasks/<task-id>/plan.md      # pay special attention to "## Design Contract"
 
-# Task progress
+# Decisions and their rationale (NOT optional — read these)
+cat tasks/<task-id>/decisions.md 2>/dev/null || echo "No decisions file yet"
+
+# Progress (source of truth for what's done)
 cat tasks/<task-id>/progress.md
-
-# Task decisions (if exists)
-cat tasks/<task-id>/decisions.md 2>/dev/null || echo "No decisions file"
 ```
+
+The SessionStart hook already surfaces a digest of the Design Contract, but
+re-read the full `plan.md` and `decisions.md` so you hold the complete design,
+not just the digest.
 
 ## Step 3: Load Recommended Files
 
@@ -65,6 +71,7 @@ Proceed with the action described in "Current Focus".
 
 ```
 [ ] Read .claude/state/active.md
+[ ] Read plan.md Design Contract + decisions.md (binding strategy)
 [ ] Load task plan and progress
 [ ] Load immediate context files
 [ ] Confirm current focus

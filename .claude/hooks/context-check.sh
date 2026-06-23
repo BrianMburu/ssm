@@ -91,8 +91,49 @@ CHECKPOINT
 INPUT=$(cat)
 
 # Get session ID for per-session tracking
-SESSION_ID="${CLAUDE_SESSION_ID:-$PPID}"
+# --- SSM v3 session identity (see session-start.sh for rationale) ----------
+SESSION_ID="${CLAUDE_SESSION_ID:-}"
+if [ -z "$SESSION_ID" ]; then
+    SESSION_ID=$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d'"' -f4 2>/dev/null || echo "")
+fi
+[ -z "$SESSION_ID" ] && SESSION_ID="default"
+# --------------------------------------------------------------------------
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
+# --- SSM v3 heartbeat: UserPromptSubmit fires on every prompt, so this is the
+# most reliable liveness signal for multi-session conflict detection.
+SSM_LOCKS_DIR="$PROJECT_DIR/.claude/state/locks"
+mkdir -p "$SSM_LOCKS_DIR" 2>/dev/null || true
+date -Iseconds > "$SSM_LOCKS_DIR/$SESSION_ID.heartbeat" 2>/dev/null || true
+
+# --- Phase C: flag a conflicting LIVE session on this session's Current Task.
+# Runs every prompt (warn-once per conflict), independent of context level.
+CONFLICT_WARNING=""
+SESSION_STATE_F="$PROJECT_DIR/.claude/state/sessions/session-$SESSION_ID.md"
+if [ -f "$SESSION_STATE_F" ]; then
+    CUR_TASK=$(grep -A1 "^## Current Task" "$SESSION_STATE_F" 2>/dev/null | tail -1 | tr -d '[:space:]')
+    if [ -n "$CUR_TASK" ] && [ "$CUR_TASK" != "none" ] && [ "$CUR_TASK" != "None" ]; then
+        LOCK_F="$SSM_LOCKS_DIR/$CUR_TASK.lock"
+        if [ -f "$LOCK_F" ]; then
+            OWNER=$(head -1 "$LOCK_F" 2>/dev/null | tr -d '[:space:]')
+            if [ -n "$OWNER" ] && [ "$OWNER" != "$SESSION_ID" ]; then
+                OHB="$SSM_LOCKS_DIR/$OWNER.heartbeat"
+                if [ -f "$OHB" ]; then
+                    OLAST=$(date -d "$(cat "$OHB" 2>/dev/null)" +%s 2>/dev/null || echo 0)
+                    OAGE=$(( ( $(date +%s) - OLAST ) / 60 ))
+                    if [ "$OAGE" -lt 30 ]; then
+                        CWARN_FILE="/tmp/ssm-warned-$SESSION_ID.txt"
+                        CTOKEN="active-conflict:$CUR_TASK:$OWNER"
+                        if ! grep -qxF "$CTOKEN" "$CWARN_FILE" 2>/dev/null; then
+                            echo "$CTOKEN" >> "$CWARN_FILE" 2>/dev/null || true
+                            CONFLICT_WARNING="⚠️ SSM CONFLICT: your Current Task '$CUR_TASK' is also held by another LIVE session ($OWNER, active ${OAGE}m ago). Two sessions on one task can clobber each other's state. Coordinate, or have one session /release-task."
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    fi
+fi
 
 # Multiple ways to get context percentage
 CONTEXT_PCT=0
@@ -117,9 +158,13 @@ if [ "$CONTEXT_PCT" -eq 0 ]; then
     fi
 fi
 
-# If we can't determine context, just continue without warning
+# If we can't determine context, still surface a conflict warning if present
 if [ "$CONTEXT_PCT" -eq 0 ] 2>/dev/null; then
-    output_continue
+    if [ -n "$CONFLICT_WARNING" ]; then
+        output_json "$CONFLICT_WARNING"
+    else
+        output_continue
+    fi
     exit 0
 fi
 
@@ -213,6 +258,17 @@ fi
 # Reset warning state if context dropped significantly (user cleared)
 if [ "$CONTEXT_PCT" -lt 40 ] && [ "$LAST_WARNING_LEVEL" -gt 0 ]; then
     rm -f "$WARNING_STATE_FILE" 2>/dev/null || true
+fi
+
+# Prepend any conflict warning so it rides alongside the context warning
+if [ -n "$CONFLICT_WARNING" ]; then
+    if [ -n "$WARNING" ]; then
+        WARNING="$CONFLICT_WARNING
+
+$WARNING"
+    else
+        WARNING="$CONFLICT_WARNING"
+    fi
 fi
 
 # Output response
